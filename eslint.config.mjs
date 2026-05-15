@@ -12,6 +12,8 @@ const eslintConfig = defineConfig([
     "out/**",
     "build/**",
     "next-env.d.ts",
+    // Standalone prototype — CDN-transpiled JSX, not a Next.js build artefact
+    "public/prototype/**",
   ]),
 ]);
 

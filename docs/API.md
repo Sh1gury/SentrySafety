@@ -151,7 +151,7 @@ The canonical TypeScript shape lives in [`src/types/scan.ts`](../src/types/scan.
 | 400 | `encrypted_archive` | Password-protected archive — we refuse to attempt decryption. |
 | 413 | `payload_too_large` | After text extraction, or zip-bomb decompression ratio exceeded. |
 | 415 | `unsupported_media_type` | Unknown MIME, or MIME-magic mismatch (e.g. `.pdf` extension on an `.exe`). |
-| 429 | `rate_limited` | Reserved; not active in MVP. |
+| 429 | `rate_limited` | Too many requests — token bucket (60 burst, 1 rps refill) per IP. |
 | 500 | `engine_error` | Unhandled exception in any layer. |
 | 502 | `model_unavailable` | Layer 2 OpenAI call failed and `DEMO_MODE` was not set. Caller may retry. |
 
@@ -169,3 +169,27 @@ This is the failsafe for live presentation. Treat it as a first-class code path,
 ## Health check
 
 `GET /api/health` — returns `{ "ok": true, "demoMode": boolean, "version": "..." }`. Used by the pre-demo smoke test.
+
+## Additional endpoints
+
+| Endpoint | Method | Description |
+|----------|--------|-------------|
+| `POST /api/v1/sanitize/batch` | POST | Array form: `{ "items": [SanitizeRequest, ...] }`, max 25 items, concurrency 5. Returns `{ "status": "success", "results": [SanitizeResponse, ...] }`. Per-item errors become `SanitizeError` entries — the batch itself returns 200. `tokenMap` is never included in batch results. |
+| `GET /api/metrics` | GET | Prometheus exposition format. Counters: `sentry_scans_total{verdict}`, `sentry_errors_total{code}`, `sentry_rate_limited_total`, `sentry_layer2_failures_total{reason}`, `sentry_layer2_cache_hits_total`, `sentry_idempotency_hits_total`. Histograms: `sentry_scan_latency_ms`, `sentry_layer{1,2,3}_latency_ms`. |
+| `GET /api/openapi` | GET | OpenAPI 3.1 spec in JSON. |
+
+## Response headers (sanitize)
+
+Every successful `POST /api/v1/sanitize` response includes:
+
+| Header | Value |
+|--------|-------|
+| `x-scan-id` | Same as `body.scanId` |
+| `x-latency-l1-ms` | Layer 1 wall-clock ms |
+| `x-latency-l2-ms` | Layer 2 wall-clock ms |
+| `x-latency-l3-ms` | Layer 3 wall-clock ms (0 when disabled) |
+| `x-rate-remaining` | Remaining tokens in the current rate-limit window |
+
+## Idempotency
+
+Send `Idempotency-Key: <uuid>` header to cache the response for 5 minutes. Replayed responses include `x-idempotent-replay: true`.

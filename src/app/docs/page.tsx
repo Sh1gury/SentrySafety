@@ -1,5 +1,7 @@
 import { type ReactNode } from "react";
 import Link from "next/link";
+import { ThemeToggle } from "@/components/theme-toggle";
+import { SiteFooter } from "@/components/site-footer";
 
 const QUICKSTART = `import { SentrySafety } from "@sentry-safety/sdk";
 
@@ -147,6 +149,14 @@ function CodeBlock({ code }: { code: string }) {
   );
 }
 
+function Chip({ children }: { children: ReactNode }) {
+  return (
+    <code className="lp-tag rounded px-1.5 py-0.5 text-xs font-mono">
+      {children}
+    </code>
+  );
+}
+
 function Section({
   id,
   title,
@@ -158,7 +168,7 @@ function Section({
 }) {
   return (
     <section id={id} className="scroll-mt-20 mb-16">
-      <h2 className="text-xl font-semibold text-zinc-900 mb-5 pb-3 border-b border-zinc-100">
+      <h2 className="lp-section-title text-xl font-semibold mb-5 pb-3 border-b">
         {title}
       </h2>
       {children}
@@ -168,32 +178,21 @@ function Section({
 
 export default function DocsPage() {
   return (
-    <div className="min-h-screen bg-white text-zinc-900 font-sans antialiased">
+    <div className="lp-page min-h-screen font-sans antialiased">
       {/* Nav */}
-      <header className="border-b border-zinc-100 sticky top-0 bg-white/95 backdrop-blur z-10">
+      <header className="lp-header border-b sticky top-0 backdrop-blur z-10">
         <div className="max-w-6xl mx-auto px-6 h-14 flex items-center justify-between">
           <Link
             href="/"
-            className="font-semibold text-sm tracking-tight hover:text-zinc-600 transition-colors"
+            className="lp-nav-link font-semibold text-sm tracking-tight"
           >
             Sentry Safety
           </Link>
-          <nav className="flex items-center gap-6 text-sm text-zinc-500">
-            <a href="#quickstart" className="hover:text-zinc-900 transition-colors">
-              Quickstart
-            </a>
-            <a href="#api" className="hover:text-zinc-900 transition-colors">
-              API
-            </a>
-            <a href="#sdk" className="hover:text-zinc-900 transition-colors">
-              SDK
-            </a>
-            <a href="#threats" className="hover:text-zinc-900 transition-colors">
-              Threats
-            </a>
+          <nav className="flex items-center gap-4 text-sm">
+            <ThemeToggle variant="landing" />
             <Link
               href="/dashboard"
-              className="ml-2 rounded-md bg-zinc-900 px-3.5 py-1.5 text-xs font-medium text-white hover:bg-zinc-700 transition-colors"
+              className="lp-btn-primary ml-2 rounded-md px-3.5 py-1.5 text-xs font-medium"
             >
               Dashboard
             </Link>
@@ -206,26 +205,22 @@ export default function DocsPage() {
         <aside className="hidden lg:block w-48 shrink-0">
           <nav className="sticky top-20 flex flex-col gap-1 text-sm">
             {[
-              ["#quickstart", "Quickstart"],
-              ["#api", "HTTP API"],
-              ["#api-request", "— Request"],
-              ["#api-response", "— Response"],
-              ["#api-errors", "— Errors"],
-              ["#sdk", "SDK Reference"],
-              ["#sdk-class", "— SentrySafety"],
-              ["#sdk-errors", "— Error model"],
-              ["#threats", "Threat Catalogue"],
-            ].map(([href, label]) => (
+              ["#quickstart", "Quickstart", false],
+              ["#api", "HTTP API", false],
+              ["#api-request", "— Request", true],
+              ["#api-response", "— Response", true],
+              ["#api-errors", "— Errors", true],
+              ["#sdk", "SDK Reference", false],
+              ["#sdk-class", "— SentrySafety", true],
+              ["#sdk-errors", "— Error model", true],
+              ["#threats", "Threat Catalogue", false],
+            ].map(([href, label, isSub]) => (
               <a
-                key={href}
-                href={href}
-                className={`py-1 transition-colors ${
-                  label.startsWith("—")
-                    ? "pl-4 text-zinc-400 hover:text-zinc-700"
-                    : "text-zinc-600 hover:text-zinc-900"
-                }`}
+                key={href as string}
+                href={href as string}
+                className={`py-1 ${isSub ? "pl-4 lp-sidebar-sub" : "lp-sidebar-link"}`}
               >
-                {label}
+                {label as string}
               </a>
             ))}
           </nav>
@@ -236,19 +231,15 @@ export default function DocsPage() {
           {/* Quickstart */}
           <Section id="quickstart" title="Quickstart">
             <div className="space-y-4">
-              <p className="text-zinc-500 text-sm leading-relaxed">
+              <p className="lp-text-2 text-sm leading-relaxed">
                 Install the SDK, create a client, and call{" "}
-                <code className="bg-zinc-100 px-1.5 py-0.5 rounded text-xs font-mono text-zinc-800">
-                  sanitize()
-                </code>
+                <Chip>sanitize()</Chip>
                 . The server defaults cover most use cases — pass a{" "}
-                <code className="bg-zinc-100 px-1.5 py-0.5 rounded text-xs font-mono text-zinc-800">
-                  config
-                </code>{" "}
+                <Chip>config</Chip>{" "}
                 only when you need to override them.
               </p>
               <CodeBlock code={QUICKSTART} />
-              <p className="text-sm text-zinc-500">
+              <p className="lp-text-2 text-sm">
                 No config needed? Omit the second argument — the server applies
                 sensible defaults (PII masking on, injections blocked, integrity
                 off).
@@ -258,31 +249,27 @@ export default function DocsPage() {
 
           {/* API */}
           <Section id="api" title="HTTP API">
-            <p className="text-zinc-500 text-sm mb-6 leading-relaxed">
+            <p className="lp-text-2 text-sm mb-6 leading-relaxed">
               All functionality is exposed over a single endpoint. The SDK wraps
               this — use it directly if you need multipart uploads or are not in
               a TypeScript environment.
             </p>
 
             <div id="api-request" className="scroll-mt-20 mb-8">
-              <h3 className="font-semibold text-zinc-800 mb-3">Request</h3>
-              <p className="text-zinc-500 text-sm mb-3">
-                <code className="bg-zinc-100 px-1.5 py-0.5 rounded text-xs font-mono text-zinc-800">
-                  POST /api/v1/sanitize
-                </code>{" "}
-                — accepts JSON or multipart/form-data. Auth header accepted but
+              <h3 className="lp-strong mb-3">Request</h3>
+              <p className="lp-text-2 text-sm mb-3">
+                <Chip>POST /api/v1/sanitize</Chip>{" "}
+                &mdash; accepts JSON or multipart/form-data. Auth header accepted but
                 not enforced in MVP.
               </p>
               <CodeBlock code={CURL_EXAMPLE} />
             </div>
 
             <div id="api-response" className="scroll-mt-20 mb-8">
-              <h3 className="font-semibold text-zinc-800 mb-3">Response</h3>
-              <p className="text-zinc-500 text-sm mb-3">
+              <h3 className="lp-strong mb-3">Response</h3>
+              <p className="lp-text-2 text-sm mb-3">
                 Always{" "}
-                <code className="bg-zinc-100 px-1.5 py-0.5 rounded text-xs font-mono text-zinc-800">
-                  200 OK
-                </code>{" "}
+                <Chip>200 OK</Chip>{" "}
                 with a verdict in the body. A blocked document is not an HTTP
                 error.
               </p>
@@ -291,12 +278,12 @@ export default function DocsPage() {
               <div className="mt-6 overflow-x-auto">
                 <table className="w-full text-sm border-collapse">
                   <thead>
-                    <tr className="border-b border-zinc-200">
-                      <th className="text-left py-2 pr-4 font-medium text-zinc-700 w-48">Field</th>
-                      <th className="text-left py-2 font-medium text-zinc-700">Notes</th>
+                    <tr className="lp-border border-b">
+                      <th className="text-left py-2 pr-4 lp-strong font-medium w-48">Field</th>
+                      <th className="text-left py-2 lp-strong font-medium">Notes</th>
                     </tr>
                   </thead>
-                  <tbody className="text-zinc-500">
+                  <tbody className="lp-text-2">
                     {[
                       ["verdict", '"allow" | "warn" | "block" — fused across all layers.'],
                       ["clean_text", "PII-tokenised text safe to forward to a downstream LLM."],
@@ -306,9 +293,9 @@ export default function DocsPage() {
                       ["metadata.layer2.demoMode", 'true when Layer 2 used the mock shim. UI should show a "MOCK" badge.'],
                       ["latencyMs", "End-to-end wall clock time."],
                     ].map(([field, note]) => (
-                      <tr key={field} className="border-b border-zinc-100">
+                      <tr key={field} className="lp-border-light border-b">
                         <td className="py-2 pr-4">
-                          <code className="text-xs font-mono text-zinc-700">{field}</code>
+                          <code className="lp-tag rounded text-xs font-mono px-1 py-0.5">{field}</code>
                         </td>
                         <td className="py-2">{note}</td>
                       </tr>
@@ -319,21 +306,21 @@ export default function DocsPage() {
             </div>
 
             <div id="api-errors" className="scroll-mt-20">
-              <h3 className="font-semibold text-zinc-800 mb-3">Error codes</h3>
+              <h3 className="lp-strong mb-3">Error codes</h3>
               <div className="overflow-x-auto">
                 <table className="w-full text-sm border-collapse">
                   <thead>
-                    <tr className="border-b border-zinc-200">
-                      <th className="text-left py-2 pr-4 font-medium text-zinc-700">Code</th>
-                      <th className="text-left py-2 pr-4 font-medium text-zinc-700 w-16">HTTP</th>
-                      <th className="text-left py-2 font-medium text-zinc-700">When</th>
+                    <tr className="lp-border border-b">
+                      <th className="text-left py-2 pr-4 lp-strong font-medium">Code</th>
+                      <th className="text-left py-2 pr-4 lp-strong font-medium w-16">HTTP</th>
+                      <th className="text-left py-2 lp-strong font-medium">When</th>
                     </tr>
                   </thead>
-                  <tbody className="text-zinc-500">
+                  <tbody className="lp-text-2">
                     {errorCodes.map((row) => (
-                      <tr key={row.code} className="border-b border-zinc-100">
+                      <tr key={row.code} className="lp-border-light border-b">
                         <td className="py-2 pr-4">
-                          <code className="text-xs font-mono text-zinc-700">{row.code}</code>
+                          <code className="lp-tag rounded text-xs font-mono px-1 py-0.5">{row.code}</code>
                         </td>
                         <td className="py-2 pr-4">{row.http}</td>
                         <td className="py-2">{row.when}</td>
@@ -348,46 +335,44 @@ export default function DocsPage() {
           {/* SDK */}
           <Section id="sdk" title="SDK Reference">
             <div id="sdk-class" className="scroll-mt-20 mb-8">
-              <h3 className="font-semibold text-zinc-800 mb-3">SentrySafety class</h3>
-              <p className="text-zinc-500 text-sm mb-3 leading-relaxed">
+              <h3 className="lp-strong mb-3">SentrySafety class</h3>
+              <p className="lp-text-2 text-sm mb-3 leading-relaxed">
                 Zero dependencies. Targets Node 20+ and modern browsers. Uses
                 global{" "}
-                <code className="bg-zinc-100 px-1.5 py-0.5 rounded text-xs font-mono text-zinc-800">
-                  fetch
-                </code>
+                <Chip>fetch</Chip>
                 .
               </p>
               <CodeBlock code={SDK_CLASS} />
 
-              <div className="mt-5 text-sm text-zinc-500 space-y-2">
+              <div className="mt-5 text-sm lp-text-2 space-y-2">
                 <p>
-                  <strong className="text-zinc-700">input</strong> — pass a
+                  <strong className="lp-strong">input</strong> &mdash; pass a
                   plain string for text content, or a{" "}
-                  <code className="bg-zinc-100 px-1.5 py-0.5 rounded text-xs font-mono">File</code>{" "}
-                  /{" "}
-                  <code className="bg-zinc-100 px-1.5 py-0.5 rounded text-xs font-mono">Blob</code>{" "}
+                  <Chip>File</Chip>
+                  {" / "}
+                  <Chip>Blob</Chip>{" "}
                   for binary files. The SDK base64-encodes binary inputs
                   automatically.
                 </p>
                 <p>
-                  <strong className="text-zinc-700">config</strong> — all
+                  <strong className="lp-strong">config</strong> &mdash; all
                   sections are optional. Omit entirely to use server defaults.
                   Partial sections are fine.
                 </p>
                 <p>
-                  <strong className="text-zinc-700">Returns</strong>{" "}
-                  <code className="bg-zinc-100 px-1.5 py-0.5 rounded text-xs font-mono">SanitizeSuccess</code>{" "}
+                  <strong className="lp-strong">Returns</strong>{" "}
+                  <Chip>SanitizeSuccess</Chip>{" "}
                   or throws a{" "}
-                  <code className="bg-zinc-100 px-1.5 py-0.5 rounded text-xs font-mono">SentrySafetyError</code>{" "}
+                  <Chip>SentrySafetyError</Chip>{" "}
                   subclass.
                 </p>
               </div>
             </div>
 
             <div id="sdk-errors" className="scroll-mt-20">
-              <h3 className="font-semibold text-zinc-800 mb-3">Error model</h3>
+              <h3 className="lp-strong mb-3">Error model</h3>
               <CodeBlock code={ERROR_MODEL} />
-              <div className="mt-4 text-sm text-zinc-500 space-y-1.5">
+              <div className="mt-4 text-sm lp-text-2 space-y-1.5">
                 {[
                   "InvalidPayloadError (400)",
                   "EncryptedArchiveError (400)",
@@ -398,13 +383,9 @@ export default function DocsPage() {
                   "ModelUnavailableError (502)",
                 ].map((e) => (
                   <p key={e}>
-                    <code className="bg-zinc-100 px-1.5 py-0.5 rounded text-xs font-mono text-zinc-700">
-                      {e}
-                    </code>{" "}
-                    — extends{" "}
-                    <code className="bg-zinc-100 px-1.5 py-0.5 rounded text-xs font-mono text-zinc-700">
-                      SentrySafetyError
-                    </code>
+                    <Chip>{e}</Chip>{" "}
+                    &mdash; extends{" "}
+                    <Chip>SentrySafetyError</Chip>
                   </p>
                 ))}
               </div>
@@ -413,27 +394,27 @@ export default function DocsPage() {
 
           {/* Threats */}
           <Section id="threats" title="Threat Catalogue">
-            <p className="text-zinc-500 text-sm mb-6 leading-relaxed">
+            <p className="lp-text-2 text-sm mb-6 leading-relaxed">
               Every threat type Sentry Safety detects, which layer catches it,
               and how.
             </p>
-            <div className="space-y-0 border border-zinc-200 rounded-xl overflow-hidden">
+            <div className="lp-card lp-border space-y-0 border rounded-xl overflow-hidden">
               {threats.map((t, i) => (
                 <div
                   key={t.type}
                   className={`flex flex-col sm:flex-row gap-2 px-5 py-4 text-sm ${
-                    i < threats.length - 1 ? "border-b border-zinc-100" : ""
+                    i < threats.length - 1 ? "lp-border-light border-b" : ""
                   }`}
                 >
                   <div className="flex items-start gap-3 sm:w-72 shrink-0">
-                    <code className="text-xs font-mono text-zinc-700 bg-zinc-50 border border-zinc-200 rounded px-2 py-0.5 whitespace-nowrap">
+                    <code className="lp-tag border rounded px-2 py-0.5 text-xs font-mono whitespace-nowrap">
                       {t.type}
                     </code>
-                    <span className="text-xs text-zinc-400 whitespace-nowrap pt-0.5">
+                    <span className="lp-text-3 text-xs whitespace-nowrap pt-0.5">
                       {t.layer}
                     </span>
                   </div>
-                  <p className="text-zinc-500 leading-relaxed">{t.description}</p>
+                  <p className="lp-text-2 leading-relaxed">{t.description}</p>
                 </div>
               ))}
             </div>
@@ -441,20 +422,7 @@ export default function DocsPage() {
         </main>
       </div>
 
-      {/* Footer */}
-      <footer className="border-t border-zinc-100 mt-8">
-        <div className="max-w-6xl mx-auto px-6 py-6 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 text-xs text-zinc-400">
-          <Link href="/" className="hover:text-zinc-600 transition-colors">
-            Sentry Safety
-          </Link>
-          <div className="flex gap-4">
-            <a href="#quickstart" className="hover:text-zinc-600 transition-colors">Quickstart</a>
-            <a href="#api" className="hover:text-zinc-600 transition-colors">API</a>
-            <a href="#sdk" className="hover:text-zinc-600 transition-colors">SDK</a>
-            <a href="#threats" className="hover:text-zinc-600 transition-colors">Threats</a>
-          </div>
-        </div>
-      </footer>
+      <SiteFooter />
     </div>
   );
 }

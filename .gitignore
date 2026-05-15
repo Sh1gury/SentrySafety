@@ -1,5 +1,5 @@
 # See https://help.github.com/articles/ignoring-files/ for more about ignoring files.
-CLAUDE.md
+
 # dependencies
 /node_modules
 /.pnp
@@ -40,8 +40,8 @@ yarn-error.log*
 *.tsbuildinfo
 next-env.d.ts
 
+# sdk package build artifacts
+/packages/sentry-safety-sdk/dist/
+/packages/sentry-safety-sdk/node_modules/
+
 CLAUDE.md
-
-.env.local
-.env.example    
-

@@ -2,11 +2,16 @@
 
 import { useMemo, useState, useEffect } from 'react';
 import { PageHeader, formatRelTime } from './shared';
+import { getDemoApiKey } from './apiKey';
 import type { ScanRecord } from './types';
 
 interface StatsResponse {
   totals: { all: number; allow: number; warn: number; block: number; error: number };
   latency: { avgMs: number; p50Ms: number; p95Ms: number };
+  latencyByLayer: {
+    layer1: { avgMs: number; p50Ms: number };
+    layer2: { avgMs: number; p50Ms: number };
+  };
   threats: Record<string, number>;
   layer3EnabledCount: number;
   generatedAt: string;
@@ -28,7 +33,7 @@ export function DashboardPage({ scans }: { scans: ScanRecord[] }) {
     let cancelled = false;
     async function load() {
       try {
-        const r = await fetch('/api/v1/stats', { headers: { 'x-api-key': 'demo' } });
+        const r = await fetch('/api/v1/stats', { headers: { 'x-api-key': getDemoApiKey() } });
         if (!r.ok) throw new Error(`stats ${r.status}`);
         const data = await r.json() as StatsResponse;
         if (!cancelled) {
@@ -250,8 +255,8 @@ export function DashboardPage({ scans }: { scans: ScanRecord[] }) {
             <span className="mono" style={{ fontSize: 11, color: 'var(--text3)' }}>p50 latency</span>
           </div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 14, marginTop: 6 }}>
-            <LayerLatencyRow label="Layer 1" sub="PII sanitizer" ms={89} max={500} color="allow" />
-            <LayerLatencyRow label="Layer 2" sub="LLM ensemble" ms={334} max={500} color="allow" />
+            <LayerLatencyRow label="Layer 1" sub="PII sanitizer" ms={serverStats?.latencyByLayer?.layer1?.p50Ms ?? null} max={500} color="allow" />
+            <LayerLatencyRow label="Layer 2" sub="LLM ensemble" ms={serverStats?.latencyByLayer?.layer2?.p50Ms ?? null} max={500} color="allow" />
             <LayerLatencyRow label="Layer 3" sub="AI autophagy" ms={null} disabled />
           </div>
           <div style={{ borderTop: '1px solid var(--border)', paddingTop: 12, marginTop: 14, display: 'flex', flexDirection: 'column', gap: 8 }}>

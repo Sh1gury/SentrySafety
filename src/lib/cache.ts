@@ -42,10 +42,6 @@ export function cacheSet<T>(key: string, value: T, ttlMs: number): void {
   }
 }
 
-export function cacheDelete(key: string): void {
-  store.delete(key);
-}
-
 export function cacheSize(): number {
   return store.size;
 }

@@ -42,7 +42,7 @@ export default function AppRoot({ initialUser }: { initialUser: string }) {
     <div className="app-shell">
       <TopNav page={page} onNav={setPage} userEmail={initialUser} onLogout={handleLogout} />
       {page === 'scan' && (
-        <ScanPage config={config} setConfig={setConfig} scans={scans} addScan={addScan} />
+        <ScanPage config={config} setConfig={setConfig} addScan={addScan} />
       )}
       {page === 'logs' && <LogsPage scans={scans} />}
       {page === 'dashboard' && <DashboardPage scans={scans} />}

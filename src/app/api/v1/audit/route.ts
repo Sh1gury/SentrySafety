@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { listAudit, auditCount } from "@/lib/auditLog";
+import { listAudit } from "@/lib/auditLog";
 import { checkRate } from "@/lib/rateLimit";
 import { logger } from "@/lib/logger";
 import { inc } from "@/lib/metrics";
@@ -76,15 +76,40 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
     inc("sentry_audit_requests_total");
 
     const url = request.nextUrl;
-    const raw = Number(url.searchParams.get("limit"));
+    const rawLimit = Number(url.searchParams.get("limit"));
     // Clamp to [1, 1000]; fallback to 100 when param is absent or NaN.
-    const limit = Number.isNaN(raw) || raw <= 0 ? 100 : Math.min(raw, 1000);
+    const limit = Number.isNaN(rawLimit) || rawLimit <= 0 ? 100 : Math.min(rawLimit, 1000);
 
-    const entries = listAudit(limit);
-    const total = auditCount();
+    const rawOffset = Number(url.searchParams.get("offset"));
+    const offset = Number.isNaN(rawOffset) || rawOffset < 0 ? 0 : rawOffset;
+
+    const sinceParam = url.searchParams.get("since");
+    const untilParam = url.searchParams.get("until");
+    const verdictParam = url.searchParams.get("verdict");
+
+    const sinceMs = sinceParam ? Date.parse(sinceParam) : NaN;
+    const untilMs = untilParam ? Date.parse(untilParam) : NaN;
+    const verdictFilter =
+      verdictParam === "allow" || verdictParam === "warn" || verdictParam === "block"
+        ? verdictParam
+        : null;
+
+    let filtered = listAudit(undefined);
+    if (!Number.isNaN(sinceMs)) {
+      filtered = filtered.filter((e) => new Date(e.ts).getTime() >= sinceMs);
+    }
+    if (!Number.isNaN(untilMs)) {
+      filtered = filtered.filter((e) => new Date(e.ts).getTime() <= untilMs);
+    }
+    if (verdictFilter) {
+      filtered = filtered.filter((e) => e.verdict === verdictFilter);
+    }
+
+    const total = filtered.length;
+    const entries = filtered.slice(offset, offset + limit);
 
     return NextResponse.json(
-      { entries, total },
+      { entries, total, limit, offset },
       {
         headers: {
           ...corsHeaders(origin),

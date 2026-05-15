@@ -3,18 +3,19 @@
 import { useState, useRef } from 'react';
 import {
   classNames, Toggle, Badge, Pill, VerdictBadge, Collapsible, PageHeader,
-  PII_ENTITIES, PLACEHOLDER_TEXT, PRESETS,
+  PII_ENTITIES,
 } from './shared';
+import { PLACEHOLDER_TEXT, PRESETS } from './samples';
+import { getDemoApiKey } from './apiKey';
 import type { ScanRecord, ScanConfig, PiiHit } from './types';
 import { SentrySafety } from '@/lib/sdk';
 import type { SanitizeSuccess, SanitizeConfig } from '@/types/scan';
 
-const client = new SentrySafety({ apiKey: 'demo', baseUrl: '' });
+const client = new SentrySafety({ apiKey: getDemoApiKey(), baseUrl: '' });
 
 interface ScanPageProps {
   config: ScanConfig;
   setConfig: (fn: (c: ScanConfig) => ScanConfig) => void;
-  scans: ScanRecord[];
   addScan: (s: ScanRecord) => void;
 }
 

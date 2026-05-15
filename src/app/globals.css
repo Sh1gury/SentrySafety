@@ -1,3 +1,5 @@
+@import "tailwindcss";
+
 /* ============ TOKENS ============ */
 :root {
   --bg: #0a0c10;
@@ -35,17 +37,25 @@
   --shadow-soft: 0 1px 0 rgba(255,255,255,0.03) inset, 0 8px 24px rgba(0,0,0,0.3);
 }
 
-* { box-sizing: border-box; margin: 0; padding: 0; }
-html, body { background: var(--bg); }
-body {
-  color: var(--text);
-  font-family: var(--sans);
-  font-size: 14px;
-  min-height: 100vh;
-  -webkit-font-smoothing: antialiased;
-  font-feature-settings: 'cv02', 'cv03', 'cv04', 'cv11';
+@layer base {
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { background: var(--bg); }
+  body {
+    color: var(--text);
+    font-family: var(--sans);
+    font-size: 14px;
+    min-height: 100vh;
+    -webkit-font-smoothing: antialiased;
+    font-feature-settings: 'cv02', 'cv03', 'cv04', 'cv11';
+  }
+  button { font-family: inherit; }
+
+  /* Landing page (Zone C) uses light theme */
+  body:has(.light-page) {
+    background: #fff;
+    color: #18181b;
+  }
 }
-button { font-family: inherit; }
 
 .app-shell {
   min-height: 100vh;

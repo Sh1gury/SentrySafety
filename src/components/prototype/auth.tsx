@@ -2,11 +2,11 @@
 
 import { useState } from 'react';
 import { Logo } from './shared';
-import type { Page } from './types';
+type AuthMode = 'login' | 'register';
 
 interface AuthPageProps {
-  mode: 'login' | 'register';
-  onSwitch: (mode: Page) => void;
+  mode: AuthMode;
+  onSwitch: (mode: AuthMode) => void;
   onSubmit: (email: string) => void;
 }
 

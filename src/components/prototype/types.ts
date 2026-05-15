@@ -1,4 +1,7 @@
-export type Verdict = 'allow' | 'warn' | 'block';
+import type { Layer1Report, Layer2Report, Layer3Report } from '@/types/scan';
+
+export type { Verdict } from '@/types/scan';
+export type { Layer1Report, Layer2Report, Layer3Report };
 
 export interface PiiHit {
   token: string;
@@ -10,7 +13,7 @@ export interface ScanRecord {
   id: string;
   ts: number;
   kind: string;
-  verdict: Verdict;
+  verdict: import('@/types/scan').Verdict;
   pii: number;
   threats: number;
   threatList: string[];
@@ -20,21 +23,9 @@ export interface ScanRecord {
   preview: string;
   tokenMap: Record<string, string>;
   piiHits?: PiiHit[];
-  layer1: { verdict: Verdict; removed_paragraphs: number };
-  layer2: {
-    verdict: Verdict;
-    score: number;
-    demoMode: boolean;
-    agents: {
-      semantic: { verdict: Verdict; score: number };
-      logic: { verdict: Verdict; score: number };
-    };
-  };
-  layer3: {
-    enabled: boolean;
-    synthetic_paragraphs_removed?: number;
-    confidence?: number;
-  };
+  layer1: Layer1Report;
+  layer2: Layer2Report;
+  layer3: Layer3Report;
 }
 
 export interface ScanConfig {
@@ -52,4 +43,4 @@ export interface ScanConfig {
   };
 }
 
-export type Page = 'login' | 'register' | 'scan' | 'logs' | 'dashboard' | 'settings' | 'plan';
+export type Page = 'scan' | 'logs' | 'dashboard' | 'settings' | 'plan';

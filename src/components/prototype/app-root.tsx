@@ -1,13 +1,13 @@
 'use client';
 
 import { useState } from 'react';
-import { TopNav, seedScans } from './shared';
-import { AuthPage } from './auth';
+import { TopNav } from './shared';
 import { ScanPage } from './scan';
 import { LogsPage } from './logs';
 import { DashboardPage } from './dashboard';
 import { SettingsPage } from './settings';
 import { PlanPage } from './plan';
+import { logout } from '@/actions/auth';
 import type { ScanRecord, ScanConfig, Page } from './types';
 
 const DEFAULT_CONFIG: ScanConfig = {
@@ -25,46 +25,29 @@ const DEFAULT_CONFIG: ScanConfig = {
   },
 };
 
-export default function AppRoot() {
-  const [page, setPage] = useState<Page>('login');
-  const [user, setUser] = useState<string | null>(null);
+export default function AppRoot({ initialUser }: { initialUser: string }) {
+  const [page, setPage] = useState<Page>('scan');
   const [config, setConfig] = useState<ScanConfig>(DEFAULT_CONFIG);
-  const [scans, setScans] = useState<ScanRecord[]>(() => seedScans());
+  const [scans, setScans] = useState<ScanRecord[]>([]);
 
-  function handleAuth(email: string) {
-    setUser(email);
-    setPage('scan');
-  }
-
-  function logout() {
-    setUser(null);
-    setPage('login');
+  async function handleLogout() {
+    await logout();
   }
 
   function addScan(s: ScanRecord) {
     setScans(prev => [s, ...prev]);
   }
 
-  if (!user) {
-    return (
-      <AuthPage
-        mode={page === 'register' ? 'register' : 'login'}
-        onSwitch={setPage}
-        onSubmit={handleAuth}
-      />
-    );
-  }
-
   return (
     <div className="app-shell">
-      <TopNav page={page} onNav={setPage} userEmail={user} onLogout={logout} />
+      <TopNav page={page} onNav={setPage} userEmail={initialUser} onLogout={handleLogout} />
       {page === 'scan' && (
         <ScanPage config={config} setConfig={setConfig} scans={scans} addScan={addScan} />
       )}
       {page === 'logs' && <LogsPage scans={scans} />}
       {page === 'dashboard' && <DashboardPage scans={scans} />}
       {page === 'settings' && (
-        <SettingsPage config={config} setConfig={setConfig} userEmail={user} />
+        <SettingsPage config={config} setConfig={setConfig} userEmail={initialUser} />
       )}
       {page === 'plan' && <PlanPage />}
     </div>

@@ -2,10 +2,14 @@
 
 import { useState, useRef } from 'react';
 import {
-  classNames, makeScanId, Toggle, Badge, Pill, VerdictBadge, Collapsible, PageHeader,
+  classNames, Toggle, Badge, Pill, VerdictBadge, Collapsible, PageHeader,
   PII_ENTITIES, PLACEHOLDER_TEXT, PRESETS,
 } from './shared';
-import type { ScanRecord, ScanConfig, PiiHit, Verdict } from './types';
+import type { ScanRecord, ScanConfig, PiiHit } from './types';
+import { SentrySafety } from '@/lib/sdk';
+import type { SanitizeSuccess, SanitizeConfig } from '@/types/scan';
+
+const client = new SentrySafety({ apiKey: 'demo', baseUrl: '' });
 
 interface ScanPageProps {
   config: ScanConfig;
@@ -21,6 +25,7 @@ export function ScanPage({ config, setConfig, addScan }: ScanPageProps) {
   const [scanning, setScanning] = useState(false);
   const [scanStage, setScanStage] = useState(0);
   const [result, setResult] = useState<ScanRecord | null>(null);
+  const [error, setError] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const stages = ['ingest', 'sanitize', 'threat-detect', 'autophagy', 'compose'];
@@ -39,6 +44,7 @@ export function ScanPage({ config, setConfig, addScan }: ScanPageProps) {
     setText('');
     setFile(null);
     setResult(null);
+    setError(null);
   }
 
   function handleDrop(e: React.DragEvent) {
@@ -48,110 +54,47 @@ export function ScanPage({ config, setConfig, addScan }: ScanPageProps) {
     if (f) setFile(f);
   }
 
-  function detectPiiInText(t: string): PiiHit[] {
-    if (!t) return [];
-    const found: PiiHit[] = [];
-    const checks = [
-      { entity: 'EMAIL', re: /[\w.+-]+@[\w-]+\.[\w.-]+/g, type: 'EMAIL' },
-      { entity: 'IBAN', re: /\b[A-Z]{2}\d{2}[\s\dA-Z]{16,30}/g, type: 'IBAN' },
-      { entity: 'PHONE', re: /\+\d{1,3}[\s-]?\(?\d{2,4}\)?[\s-]?\d{3,4}[\s-]?\d{2,4}[\s-]?\d{0,4}/g, type: 'PHONE' },
-      { entity: 'CREDIT_CARD', re: /\b(?:\d[ -]*?){13,16}\b/g, type: 'CREDIT_CARD' },
-      { entity: 'PERSON', re: /\b[A-Z][a-z]+\s+[A-Z][a-z]+/g, type: 'PERSON' },
-    ];
-    const counts: Record<string, number> = {};
-    for (const c of checks) {
-      if (!config.privacy.entities_to_mask.includes(c.entity)) continue;
-      const matches = t.match(c.re) || [];
-      for (const m of matches) {
-        const tag = c.type + '_' + (counts[c.type] = (counts[c.type] || 0) + 1);
-        found.push({ token: tag, value: m, type: c.type });
-      }
-    }
-    return found;
-  }
-
-  function detectThreats(t: string): string[] {
-    if (!t) return [];
-    const threats: string[] = [];
-    if (/ignore (previous|all) (instructions|rules)|forget (previous|all) (instructions|what)/i.test(t))
-      threats.push('prompt_injection');
-    if (/(DAN|jailbreak|system prompt|dump (all|stored)|leak (the )?keys|api keys)/i.test(t))
-      threats.push('exfiltration_request');
-    if (/\b(as|act as) (an? )?(admin|administrator|system|root)/i.test(t))
-      threats.push('role_escalation');
-    if (/[​-‍﻿]/.test(t))
-      threats.push('hidden_text');
-    return threats;
-  }
-
   async function runScan() {
     if (!text && !file) return;
     setScanning(true);
     setResult(null);
+    setError(null);
     setScanStage(0);
 
-    await new Promise(r => setTimeout(r, 200)); setScanStage(1);
-    await new Promise(r => setTimeout(r, 250)); setScanStage(2);
-    await new Promise(r => setTimeout(r, 280)); setScanStage(3);
-    if (config.integrity.check_autophagy) await new Promise(r => setTimeout(r, 200));
-    setScanStage(4);
-    await new Promise(r => setTimeout(r, 180));
+    // Visual stage animation runs in parallel with real request.
+    // We resolve when BOTH the animation has played through enough stages AND the response arrives.
+    const stageAnimation = (async () => {
+      await new Promise(r => setTimeout(r, 200)); setScanStage(1);
+      await new Promise(r => setTimeout(r, 250)); setScanStage(2);
+      await new Promise(r => setTimeout(r, 280)); setScanStage(3);
+      if (config.integrity.check_autophagy) await new Promise(r => setTimeout(r, 200));
+      setScanStage(4);
+      await new Promise(r => setTimeout(r, 180));
+    })();
 
-    const piiHits = config.privacy.mask_pii ? detectPiiInText(text) : [];
-    const threats = detectThreats(text);
-
-    let verdict: Verdict = 'allow';
-    if (threats.includes('prompt_injection') || threats.includes('exfiltration_request')) verdict = 'block';
-    else if (threats.length > 0) verdict = 'warn';
-
-    const fileThreats: string[] = [];
-    if (file) {
-      if (file.name.endsWith('.zip')) { fileThreats.push('zip_bomb'); verdict = 'block'; }
-      if (/macro|invoice/i.test(file.name) && file.name.endsWith('.docx')) { fileThreats.push('macro_present'); verdict = 'block'; }
-    }
-    const allThreats = [...threats, ...fileThreats];
-
-    const layer2Score = verdict === 'block' ? 0.78 + Math.random() * 0.2
-      : verdict === 'warn' ? 0.4 + Math.random() * 0.25
-      : Math.random() * 0.2;
-
-    const layer3 = config.integrity.check_autophagy
-      ? { enabled: true, synthetic_paragraphs_removed: text.length > 800 ? 2 : 0, confidence: 0.31 + Math.random() * 0.4 }
-      : { enabled: false };
-
-    const tokenMap: Record<string, string> = {};
-    piiHits.forEach(h => { tokenMap[h.token] = h.value; });
-
-    const scanResult: ScanRecord = {
-      id: makeScanId(),
-      ts: Date.now(),
-      kind: file ? (file.name.split('.').pop() || 'file').toUpperCase() : 'text',
-      verdict,
-      pii: piiHits.length,
-      threats: allThreats.length,
-      threatList: allThreats,
-      latency: 280 + Math.floor(Math.random() * 350),
-      bytes: file ? file.size : text.length,
-      filename: file ? file.name : undefined,
-      preview: file ? `[${(file.name.split('.').pop() || 'file').toUpperCase()}] ${file.name}` : (text.slice(0, 120) || '(empty)'),
-      tokenMap,
-      piiHits,
-      layer1: { verdict: 'allow', removed_paragraphs: 0 },
-      layer2: {
-        verdict,
-        score: layer2Score,
-        demoMode: true,
-        agents: {
-          semantic: { verdict, score: Math.max(0, Math.min(1, layer2Score + (Math.random() - 0.5) * 0.15)) },
-          logic: { verdict, score: Math.max(0, Math.min(1, layer2Score + (Math.random() - 0.5) * 0.15)) },
+    try {
+      const apiConfig: Partial<SanitizeConfig> = {
+        privacy: {
+          mask_pii: config.privacy.mask_pii,
+          entities_to_mask: config.privacy.entities_to_mask as SanitizeConfig['privacy']['entities_to_mask'],
         },
-      },
-      layer3,
-    };
-
-    setResult(scanResult);
-    addScan(scanResult);
-    setScanning(false);
+        security: config.security,
+        integrity: config.integrity,
+      };
+      const input: string | File = file ?? text;
+      const [response] = await Promise.all([
+        client.sanitize(input, apiConfig),
+        stageAnimation,
+      ]);
+      const scanResult = mapResponseToRecord(response, { text, file });
+      setResult(scanResult);
+      addScan(scanResult);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Unknown scan error';
+      setError(message);
+    } finally {
+      setScanning(false);
+    }
   }
 
   return (
@@ -260,13 +203,20 @@ export function ScanPage({ config, setConfig, addScan }: ScanPageProps) {
             </div>
           )}
 
+          {error && !scanning && (
+            <div className="card fade-in" style={{ marginTop: 16, background: 'var(--danger-bg)', borderColor: 'rgba(239,68,68,0.2)' }}>
+              <div className="mono" style={{ fontSize: 11, color: 'var(--danger)', letterSpacing: '0.1em', marginBottom: 6 }}>SCAN ERROR</div>
+              <div style={{ fontSize: 13, color: 'var(--text2)' }}>{error}</div>
+            </div>
+          )}
+
           {result && !scanning && (
             <div className="card fade-in" style={{ marginTop: 16 }}>
               <ResultBlock result={result} />
             </div>
           )}
 
-          {!result && !scanning && (
+          {!result && !error && !scanning && (
             <div className="card" style={{ marginTop: 16, padding: 28, textAlign: 'center' }}>
               <div className="mono" style={{ fontSize: 11, color: 'var(--text3)', letterSpacing: '0.1em', marginBottom: 6 }}>
                 AWAITING INPUT
@@ -285,6 +235,54 @@ export function ScanPage({ config, setConfig, addScan }: ScanPageProps) {
       </div>
     </div>
   );
+}
+
+function mapResponseToRecord(
+  response: SanitizeSuccess,
+  src: { text: string; file: File | null },
+): ScanRecord {
+  const kind = src.file
+    ? (src.file.name.split('.').pop() ?? 'file').toUpperCase()
+    : 'text';
+
+  const threatsBlocked = response.metadata.threats_blocked;
+  const threats = Object.values(threatsBlocked).reduce((a, b) => a + b, 0);
+  const threatList = (Object.entries(threatsBlocked) as [string, number][])
+    .filter(([, count]) => count > 0)
+    .map(([key]) => key);
+  if (response.metadata.synthetic_spam_removed) {
+    threatList.push('synthetic_spam');
+  }
+
+  const preview = src.file
+    ? '[' + kind + '] ' + src.file.name
+    : (response.clean_text.slice(0, 120) || '(empty)');
+
+  const tokenMap = response.tokenMap ?? {};
+  const piiHits: PiiHit[] = Object.entries(tokenMap).map(([token, value]) => ({
+    token,
+    value,
+    type: token.split('_')[0],
+  }));
+
+  return {
+    id: response.scanId,
+    ts: Date.now(),
+    kind,
+    verdict: response.verdict,
+    pii: response.metadata.pii_masked_count,
+    threats,
+    threatList,
+    latency: response.latencyMs,
+    bytes: src.file ? src.file.size : src.text.length,
+    filename: src.file?.name,
+    preview,
+    tokenMap,
+    piiHits,
+    layer1: response.metadata.layer1,
+    layer2: response.metadata.layer2,
+    layer3: response.metadata.layer3,
+  };
 }
 
 function SettingsPanel({ config, setConfig }: { config: ScanConfig; setConfig: (fn: (c: ScanConfig) => ScanConfig) => void }) {

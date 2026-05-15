@@ -63,7 +63,7 @@ const features = [
 
 export default function Home() {
   return (
-    <div className="min-h-screen bg-white text-zinc-900 font-sans antialiased">
+    <div className="light-page min-h-screen bg-white text-zinc-900 font-sans antialiased">
       {/* Nav */}
       <header className="border-b border-zinc-100 sticky top-0 bg-white/95 backdrop-blur z-10">
         <div className="max-w-6xl mx-auto px-6 h-14 flex items-center justify-between">

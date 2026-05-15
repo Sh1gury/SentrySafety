@@ -21,7 +21,7 @@ export const metadata: Metadata = {
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en" className={`${ibmPlexSans.variable} ${ibmPlexMono.variable}`}>
+    <html lang="en" suppressHydrationWarning className={`${ibmPlexSans.variable} ${ibmPlexMono.variable}`}>
       <body>{children}</body>
     </html>
   );

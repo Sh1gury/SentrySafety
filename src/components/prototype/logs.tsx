@@ -146,7 +146,6 @@ export function LogsPage({ scans }: { scans: ScanRecord[] }) {
 
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 14, fontSize: 11, color: 'var(--text3)', fontFamily: 'var(--mono)', letterSpacing: '0.05em' }}>
         <span>Showing {filtered.length} of {scans.length} records</span>
-        <span>↻ auto-refresh every 30s</span>
       </div>
 
       {selected && <ScanDetailSlideout scan={selected} onClose={() => setSelected(null)} />}

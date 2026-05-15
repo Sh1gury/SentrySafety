@@ -1,24 +1,61 @@
 'use client';
 
 import { useMemo, useState, useEffect } from 'react';
-import { PageHeader } from './shared';
+import { PageHeader, formatRelTime } from './shared';
 import type { ScanRecord } from './types';
 
-export function DashboardPage({ scans }: { scans: ScanRecord[] }) {
-  const stats = useMemo(() => {
-    const total = scans.length;
-    const allow = scans.filter(s => s.verdict === 'allow').length;
-    const block = scans.filter(s => s.verdict === 'block').length;
-    const warn = scans.filter(s => s.verdict === 'warn').length;
+interface StatsResponse {
+  totals: { all: number; allow: number; warn: number; block: number; error: number };
+  latency: { avgMs: number; p50Ms: number; p95Ms: number };
+  threats: Record<string, number>;
+  layer3EnabledCount: number;
+  generatedAt: string;
+}
 
-    const threatCounts: Record<string, number> = {};
+// Snapshot the start-of-day boundary once per module load to keep useMemo pure.
+function getTodayBoundaryMs(): number {
+  return Date.now() - 24 * 3600 * 1000;
+}
+
+export function DashboardPage({ scans }: { scans: ScanRecord[] }) {
+  // Snapshot once per render so the memo stays pure (no Date.now() inside useMemo).
+  const todayBoundary = getTodayBoundaryMs();
+
+  const [serverStats, setServerStats] = useState<StatsResponse | null>(null);
+  const [serverError, setServerError] = useState<string | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    async function load() {
+      try {
+        const r = await fetch('/api/v1/stats', { headers: { 'x-api-key': 'demo' } });
+        if (!r.ok) throw new Error(`stats ${r.status}`);
+        const data = await r.json() as StatsResponse;
+        if (!cancelled) {
+          setServerStats(data);
+          setServerError(null);
+        }
+      } catch (err) {
+        if (!cancelled) setServerError(err instanceof Error ? err.message : 'fetch failed');
+      }
+    }
+    load();
+    const id = setInterval(load, 30_000);
+    return () => { cancelled = true; clearInterval(id); };
+  }, []);
+
+  const stats = useMemo(() => {
+    // Session-local counts — used as fallback and for PII breakdown.
+    const sessionTotal = scans.length;
+    const sessionAllow = scans.filter(s => s.verdict === 'allow').length;
+    const sessionBlock = scans.filter(s => s.verdict === 'block').length;
+    const sessionWarn = scans.filter(s => s.verdict === 'warn').length;
+
+    // Session threat counts — keyed by threat name, one increment per scan that listed it.
+    const sessionThreatCounts: Record<string, number> = {};
     scans.forEach(s => (s.threatList || []).forEach(t => {
-      threatCounts[t] = (threatCounts[t] || 0) + 1;
+      sessionThreatCounts[t] = (sessionThreatCounts[t] || 0) + 1;
     }));
-    const baselineThreats: Record<string, number> = {
-      prompt_injection: 87, zip_bomb: 42, macro_present: 38, hidden_text: 31, mime_mismatch: 24, role_escalation: 21,
-    };
-    Object.entries(baselineThreats).forEach(([k, v]) => { threatCounts[k] = (threatCounts[k] || 0) + v; });
 
     const piiCounts: Record<string, number> = {};
     scans.forEach(s => {
@@ -27,29 +64,69 @@ export function DashboardPage({ scans }: { scans: ScanRecord[] }) {
         piiCounts[type] = (piiCounts[type] || 0) + 1;
       });
     });
-    const baselinePii: Record<string, number> = { PERSON: 781, IBAN: 412, EMAIL: 389, PHONE: 334, CREDIT_CARD: 89, IP: 67, LOCATION: 145, ORGANIZATION: 124 };
-    Object.entries(baselinePii).forEach(([k, v]) => { piiCounts[k] = (piiCounts[k] || 0) + v; });
     const piiTotal = Object.values(piiCounts).reduce((a, b) => a + b, 0);
 
-    const avgLat = total > 0 ? Math.round(scans.reduce((a, s) => a + s.latency, 0) / total) : 0;
+    const sessionAvgLat = sessionTotal > 0
+      ? Math.round(scans.reduce((a, s) => a + s.latency, 0) / sessionTotal)
+      : 0;
+
+    // When server stats are available, use them as the authoritative baseline.
+    // Every session scan is already counted in the server audit (recordAudit is synchronous),
+    // so we trust server totals directly rather than adding session counts on top.
+    const totalAll = serverStats ? serverStats.totals.all : sessionTotal;
+    const allowAll = serverStats ? serverStats.totals.allow : sessionAllow;
+    const blockAll = serverStats ? serverStats.totals.block : sessionBlock;
+    const warnAll = serverStats ? serverStats.totals.warn : sessionWarn;
+    const avgLat = serverStats ? serverStats.latency.avgMs : sessionAvgLat;
+
+    // Threat counts: server is the baseline; merge session keys that may not yet appear
+    // server-side by taking the max per key to avoid double-counting.
+    let threatCounts: Record<string, number>;
+    if (serverStats) {
+      threatCounts = { ...serverStats.threats };
+      for (const [key, sessionVal] of Object.entries(sessionThreatCounts)) {
+        const serverVal = threatCounts[key] ?? 0;
+        if (sessionVal > serverVal) threatCounts[key] = sessionVal;
+      }
+    } else {
+      threatCounts = sessionThreatCounts;
+    }
 
     return {
-      totalAll: total + 1239,
-      allowAll: allow + 884,
-      blockAll: block + 241,
-      warnAll: warn + 114,
-      threatCounts, piiCounts, piiTotal,
-      avgLat: avgLat || 428,
+      totalAll, allowAll, blockAll, warnAll,
+      threatCounts,
+      // PII breakdown stays session-only; server audit does not expose entity-typed PII counts.
+      piiCounts, piiTotal,
+      avgLat,
     };
-  }, [scans]);
+  }, [scans, serverStats]);
+
+  // todayCount is session-only; server audit does not expose date-filtered totals.
+  const todayCount = scans.filter(s => s.ts > todayBoundary).length;
 
   const threatRows = useMemo(() => Object.entries(stats.threatCounts).sort((a, b) => b[1] - a[1]).slice(0, 7), [stats.threatCounts]);
   const piiBreakdown = useMemo(() => Object.entries(stats.piiCounts).sort((a, b) => b[1] - a[1]), [stats.piiCounts]);
 
   const verdictTotal = stats.allowAll + stats.warnAll + stats.blockAll;
-  const allowPct = (stats.allowAll / verdictTotal * 100).toFixed(1);
-  const warnPct = (stats.warnAll / verdictTotal * 100).toFixed(1);
-  const blockPct = (stats.blockAll / verdictTotal * 100).toFixed(1);
+  const allowPct = verdictTotal > 0 ? (stats.allowAll / verdictTotal * 100).toFixed(1) : '0.0';
+  const warnPct = verdictTotal > 0 ? (stats.warnAll / verdictTotal * 100).toFixed(1) : '0.0';
+  const blockPct = verdictTotal > 0 ? (stats.blockAll / verdictTotal * 100).toFixed(1) : '0.0';
+
+  if (scans.length === 0 && (!serverStats || serverStats.totals.all === 0)) {
+    return (
+      <div className="page">
+        <PageHeader
+          eyebrow="ANALYTICS · LAST 30 DAYS"
+          title="Statistics & analytics"
+          subtitle="Overview of all scanned files and requests across your organization"
+        />
+        <div className="card" style={{ padding: 40, textAlign: 'center' }}>
+          <div className="mono" style={{ fontSize: 11, color: 'var(--text3)', letterSpacing: '0.1em', marginBottom: 8 }}>NO DATA</div>
+          <div style={{ fontSize: 13, color: 'var(--text2)' }}>No scans yet. Run your first scan to populate analytics.</div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="page">
@@ -73,7 +150,11 @@ export function DashboardPage({ scans }: { scans: ScanRecord[] }) {
         <div className="stat-card neutral">
           <div className="stat-label">Total scans</div>
           <div className="stat-value">{stats.totalAll.toLocaleString('en-US').replace(/,/g, ' ')}</div>
-          <div className="stat-sub"><span className="delta-up">▲ +{8 + scans.length}</span> today</div>
+          <div className="stat-sub">
+            {todayCount > 0
+              ? <><span className="delta-up">▲ +{todayCount}</span> today (session)</>
+              : <span style={{ color: 'var(--text3)' }}>—</span>}
+          </div>
         </div>
         <div className="stat-card allow">
           <div className="stat-label">Allowed</div>
@@ -104,7 +185,8 @@ export function DashboardPage({ scans }: { scans: ScanRecord[] }) {
             <BarRow label="Warn" value={stats.warnAll} pct={warnPct} kind="warn" />
           </div>
           <div className="divider-line"></div>
-          <SparkBars />
+          {/* SparkBars visualizes session scans only — no server history here. */}
+          <SparkBars scans={scans} nowMs={todayBoundary + 24 * 3600 * 1000} />
         </div>
 
         <div className="card">
@@ -172,15 +254,29 @@ export function DashboardPage({ scans }: { scans: ScanRecord[] }) {
             <LayerLatencyRow label="Layer 2" sub="LLM ensemble" ms={334} max={500} color="allow" />
             <LayerLatencyRow label="Layer 3" sub="AI autophagy" ms={null} disabled />
           </div>
-          <div style={{ borderTop: '1px solid var(--border)', paddingTop: 12, marginTop: 14, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <span style={{ fontSize: 13, fontWeight: 500 }}>Avg total latency</span>
-            <span className="mono" style={{ fontSize: 16, color: 'var(--accent)', fontWeight: 600 }}>{stats.avgLat} ms</span>
+          <div style={{ borderTop: '1px solid var(--border)', paddingTop: 12, marginTop: 14, display: 'flex', flexDirection: 'column', gap: 8 }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <span style={{ fontSize: 13, fontWeight: 500 }}>Avg total latency</span>
+              <span className="mono" style={{ fontSize: 16, color: 'var(--accent)', fontWeight: 600 }}>{stats.avgLat} ms</span>
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <span style={{ fontSize: 12, color: 'var(--text2)' }}>p50 latency</span>
+              <span className="mono" style={{ fontSize: 13, color: 'var(--text2)' }}>{serverStats ? `${serverStats.latency.p50Ms} ms` : '—'}</span>
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <span style={{ fontSize: 12, color: 'var(--text2)' }}>p95 latency</span>
+              <span className="mono" style={{ fontSize: 13, color: 'var(--text2)' }}>{serverStats ? `${serverStats.latency.p95Ms} ms` : '—'}</span>
+            </div>
           </div>
         </div>
       </div>
 
-      <div style={{ marginTop: 14, fontSize: 11, color: 'var(--text3)', fontFamily: 'var(--mono)', letterSpacing: '0.05em', textAlign: 'center' }}>
-        ↡ Request to /v1/analytics · updated just now · cache 30s
+      <div style={{ marginTop: 14, fontSize: 11, color: serverError ? 'var(--danger)' : 'var(--text3)', fontFamily: 'var(--mono)', letterSpacing: '0.05em', textAlign: 'center' }}>
+        {serverError
+          ? `↡ /api/v1/stats failed: ${serverError} · showing session data only`
+          : serverStats
+            ? `↡ /api/v1/stats · updated ${formatRelTime(new Date(serverStats.generatedAt).getTime())} · auto-refresh 30s`
+            : '↡ /api/v1/stats · loading…'}
       </div>
     </div>
   );
@@ -230,21 +326,21 @@ function LayerLatencyRow({ label, sub, ms, max = 500, color = 'allow', disabled 
 
 interface SparkBar { allow: number; warn: number; block: number; }
 
-function SparkBars() {
-  const [data, setData] = useState<SparkBar[]>([]);
-
-  useEffect(() => {
-    const out: SparkBar[] = [];
-    for (let i = 0; i < 14; i++) {
-      const total = 30 + Math.floor(Math.sin(i / 2.2) * 12 + Math.random() * 8);
-      const block = Math.floor(total * (0.12 + Math.random() * 0.12));
-      const warn = Math.floor(total * (0.06 + Math.random() * 0.06));
-      out.push({ allow: total - block - warn, warn, block });
+function SparkBars({ scans, nowMs }: { scans: ScanRecord[]; nowMs: number }) {
+  const data = useMemo<SparkBar[]>(() => {
+    const buckets: SparkBar[] = Array.from({ length: 14 }, () => ({ allow: 0, warn: 0, block: 0 }));
+    for (const s of scans) {
+      const daysAgo = Math.floor((nowMs - s.ts) / (24 * 3600 * 1000));
+      if (daysAgo < 0 || daysAgo >= 14) continue;
+      const idx = 13 - daysAgo;
+      if (s.verdict === 'allow') buckets[idx].allow++;
+      else if (s.verdict === 'warn') buckets[idx].warn++;
+      else if (s.verdict === 'block') buckets[idx].block++;
     }
-    setData(out);
-  }, []);
+    return buckets;
+  }, [scans, nowMs]);
 
-  const maxTotal = data.length > 0 ? Math.max(...data.map(d => d.allow + d.warn + d.block)) : 1;
+  const maxTotal = data.length > 0 ? Math.max(...data.map(d => d.allow + d.warn + d.block), 1) : 1;
 
   return (
     <div>
@@ -255,6 +351,11 @@ function SparkBars() {
       <div style={{ display: 'flex', gap: 4, alignItems: 'flex-end', height: 60 }}>
         {data.map((d, i) => {
           const total = d.allow + d.warn + d.block;
+          if (total === 0) {
+            return (
+              <div key={i} style={{ flex: 1, height: 4, borderRadius: 2, background: 'var(--border)', opacity: 0.4 }}></div>
+            );
+          }
           const h = (total / maxTotal) * 100;
           return (
             <div key={i} style={{ flex: 1, height: h + '%', display: 'flex', flexDirection: 'column-reverse', borderRadius: 2, overflow: 'hidden', minHeight: 4 }}>

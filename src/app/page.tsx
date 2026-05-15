@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { ThemeToggle } from "@/components/theme-toggle";
 
 const INSTALL_SNIPPET = `npm install @sentry-safety/sdk`;
 
@@ -63,29 +64,24 @@ const features = [
 
 export default function Home() {
   return (
-    <div className="light-page min-h-screen bg-white text-zinc-900 font-sans antialiased">
+    <div className="lp-page min-h-screen font-sans antialiased">
       {/* Nav */}
-      <header className="border-b border-zinc-100 sticky top-0 bg-white/95 backdrop-blur z-10">
+      <header className="lp-header border-b sticky top-0 backdrop-blur z-10">
         <div className="max-w-6xl mx-auto px-6 h-14 flex items-center justify-between">
-          <span className="font-semibold text-sm tracking-tight">
+          <span className="font-semibold text-sm tracking-tight lp-text-1">
             Sentry Safety
           </span>
-          <nav className="flex items-center gap-6 text-sm text-zinc-500">
-            <Link
-              href="/docs"
-              className="hover:text-zinc-900 transition-colors"
-            >
+          <nav className="flex items-center gap-6 text-sm">
+            <Link href="/docs" className="lp-nav-link transition-colors">
               Docs
             </Link>
-            <Link
-              href="/docs#api"
-              className="hover:text-zinc-900 transition-colors"
-            >
+            <Link href="/docs#api" className="lp-nav-link transition-colors">
               API
             </Link>
+            <ThemeToggle variant="landing" />
             <Link
               href="/dashboard"
-              className="ml-2 rounded-md bg-zinc-900 px-3.5 py-1.5 text-xs font-medium text-white hover:bg-zinc-700 transition-colors"
+              className="lp-btn-primary ml-2 rounded-md px-3.5 py-1.5 text-xs font-medium"
             >
               Dashboard
             </Link>
@@ -96,18 +92,18 @@ export default function Home() {
       {/* Hero */}
       <section className="max-w-6xl mx-auto px-6 pt-24 pb-20">
         <div className="max-w-2xl">
-          <span className="inline-block mb-5 rounded-full bg-zinc-100 px-3 py-1 text-xs font-medium text-zinc-600 tracking-wide uppercase">
+          <span className="lp-tag inline-block mb-5 rounded-full px-3 py-1 text-xs font-medium tracking-wide uppercase">
             Pre-RAG Firewall
           </span>
-          <h1 className="text-5xl font-semibold leading-tight tracking-tight text-zinc-900 mb-6">
+          <h1 className="lp-text-1 text-5xl font-semibold leading-tight tracking-tight mb-6">
             PII never reaches
             <br />
             the LLM.
           </h1>
-          <p className="text-lg text-zinc-500 leading-relaxed mb-8 max-w-xl">
+          <p className="lp-text-2 text-lg leading-relaxed mb-8 max-w-xl">
             Sentry Safety is a B2B middleware that scans, sanitises, and
             anonymises documents{" "}
-            <span className="text-zinc-900 font-medium">
+            <span className="lp-text-1 font-medium">
               before they touch your vector store
             </span>
             . Three layers, one HTTP call.
@@ -115,13 +111,13 @@ export default function Home() {
           <div className="flex flex-wrap gap-3">
             <Link
               href="/docs#quickstart"
-              className="rounded-md bg-zinc-900 px-5 py-2.5 text-sm font-medium text-white hover:bg-zinc-700 transition-colors"
+              className="lp-btn-primary rounded-md px-5 py-2.5 text-sm font-medium"
             >
               Quickstart
             </Link>
             <Link
               href="/docs"
-              className="rounded-md border border-zinc-200 px-5 py-2.5 text-sm font-medium text-zinc-700 hover:bg-zinc-50 transition-colors"
+              className="lp-btn-ghost rounded-md border px-5 py-2.5 text-sm font-medium"
             >
               Read the docs
             </Link>
@@ -130,12 +126,12 @@ export default function Home() {
       </section>
 
       {/* Install strip */}
-      <section className="border-y border-zinc-100 bg-zinc-50">
+      <section className="lp-alt lp-border-light border-y">
         <div className="max-w-6xl mx-auto px-6 py-5 flex flex-col sm:flex-row items-start sm:items-center gap-3">
-          <span className="text-xs font-medium text-zinc-400 uppercase tracking-widest shrink-0">
+          <span className="lp-text-3 text-xs font-medium uppercase tracking-widest shrink-0">
             Install
           </span>
-          <code className="font-mono text-sm text-zinc-800 bg-white border border-zinc-200 rounded-md px-4 py-2 select-all">
+          <code className="lp-code-inline font-mono text-sm border rounded-md px-4 py-2 select-all">
             {INSTALL_SNIPPET}
           </code>
         </div>
@@ -144,10 +140,10 @@ export default function Home() {
       {/* Three layers */}
       <section className="max-w-6xl mx-auto px-6 py-20">
         <div className="mb-12">
-          <h2 className="text-2xl font-semibold tracking-tight text-zinc-900 mb-2">
+          <h2 className="lp-text-1 text-2xl font-semibold tracking-tight mb-2">
             Three layers of protection
           </h2>
-          <p className="text-zinc-500 text-base max-w-lg">
+          <p className="lp-text-2 text-base max-w-lg">
             Each layer adds what the previous one cannot. Together they cover
             the full attack surface of a document ingestion pipeline.
           </p>
@@ -157,10 +153,10 @@ export default function Home() {
           {layers.map((layer) => (
             <div
               key={layer.number}
-              className="border border-zinc-200 rounded-xl p-6 bg-white hover:border-zinc-300 transition-colors"
+              className="lp-card border rounded-xl p-6 hover:border-zinc-300 transition-colors"
             >
               <div className="flex items-start justify-between mb-4">
-                <span className="text-3xl font-bold text-zinc-100 select-none">
+                <span className="lp-layer-num text-3xl font-bold select-none">
                   {layer.number}
                 </span>
                 <span
@@ -169,10 +165,10 @@ export default function Home() {
                   {layer.tag}
                 </span>
               </div>
-              <h3 className="text-base font-semibold text-zinc-900 mb-2">
+              <h3 className="lp-text-1 text-base font-semibold mb-2">
                 {layer.label}
               </h3>
-              <p className="text-sm text-zinc-500 leading-relaxed">
+              <p className="lp-text-2 text-sm leading-relaxed">
                 {layer.description}
               </p>
             </div>
@@ -181,7 +177,7 @@ export default function Home() {
       </section>
 
       {/* Code sample */}
-      <section className="border-y border-zinc-100 bg-zinc-950">
+      <section className="lp-border-light border-y bg-zinc-950">
         <div className="max-w-6xl mx-auto px-6 py-16">
           <div className="max-w-3xl mx-auto">
             <p className="text-xs font-medium text-zinc-400 uppercase tracking-widest mb-4">
@@ -191,7 +187,7 @@ export default function Home() {
               <code className="text-zinc-200 font-mono">{USAGE_SNIPPET}</code>
             </pre>
             <p className="mt-4 text-sm text-zinc-400">
-              Full SDK reference →{" "}
+              Full SDK reference &rarr;{" "}
               <Link
                 href="/docs#sdk"
                 className="text-zinc-200 underline underline-offset-2 hover:text-white transition-colors"
@@ -206,28 +202,28 @@ export default function Home() {
       {/* Feature grid */}
       <section className="max-w-6xl mx-auto px-6 py-20">
         <div className="mb-12">
-          <h2 className="text-2xl font-semibold tracking-tight text-zinc-900 mb-2">
+          <h2 className="lp-text-1 text-2xl font-semibold tracking-tight mb-2">
             Built for production RAG
           </h2>
         </div>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-8">
           {features.map((f) => (
             <div key={f.title}>
-              <h3 className="font-semibold text-zinc-900 mb-1.5">{f.title}</h3>
-              <p className="text-sm text-zinc-500 leading-relaxed">{f.body}</p>
+              <h3 className="lp-text-1 font-semibold mb-1.5">{f.title}</h3>
+              <p className="lp-text-2 text-sm leading-relaxed">{f.body}</p>
             </div>
           ))}
         </div>
       </section>
 
       {/* CTA */}
-      <section className="border-t border-zinc-100 bg-zinc-50">
+      <section className="lp-alt lp-border-light border-t">
         <div className="max-w-6xl mx-auto px-6 py-16 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-6">
           <div>
-            <h2 className="text-xl font-semibold text-zinc-900 mb-1">
+            <h2 className="lp-text-1 text-xl font-semibold mb-1">
               Ready to protect your pipeline?
             </h2>
-            <p className="text-zinc-500 text-sm">
+            <p className="lp-text-2 text-sm">
               Open the dashboard to run a live scan, or read the docs to
               integrate in minutes.
             </p>
@@ -235,13 +231,13 @@ export default function Home() {
           <div className="flex gap-3 shrink-0">
             <Link
               href="/dashboard"
-              className="rounded-md bg-zinc-900 px-5 py-2.5 text-sm font-medium text-white hover:bg-zinc-700 transition-colors"
+              className="lp-btn-primary rounded-md px-5 py-2.5 text-sm font-medium"
             >
               Open dashboard
             </Link>
             <Link
               href="/docs"
-              className="rounded-md border border-zinc-200 px-5 py-2.5 text-sm font-medium text-zinc-700 bg-white hover:bg-zinc-50 transition-colors"
+              className="lp-btn-ghost rounded-md border px-5 py-2.5 text-sm font-medium"
             >
               Read the docs
             </Link>
@@ -250,17 +246,17 @@ export default function Home() {
       </section>
 
       {/* Footer */}
-      <footer className="border-t border-zinc-100">
-        <div className="max-w-6xl mx-auto px-6 py-6 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 text-xs text-zinc-400">
-          <span>Sentry Safety — Infomatrix 2026</span>
+      <footer className="lp-border-light border-t">
+        <div className="max-w-6xl mx-auto px-6 py-6 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 text-xs lp-text-3">
+          <span>Sentry Safety &mdash; Infomatrix 2026</span>
           <div className="flex gap-4">
-            <Link href="/docs" className="hover:text-zinc-600 transition-colors">
+            <Link href="/docs" className="lp-footer-link transition-colors">
               Docs
             </Link>
-            <Link href="/docs#api" className="hover:text-zinc-600 transition-colors">
+            <Link href="/docs#api" className="lp-footer-link transition-colors">
               API
             </Link>
-            <Link href="/docs#sdk" className="hover:text-zinc-600 transition-colors">
+            <Link href="/docs#sdk" className="lp-footer-link transition-colors">
               SDK
             </Link>
           </div>

@@ -1,6 +1,8 @@
 'use client';
 
 import { useState, useRef, useEffect } from 'react';
+import Link from 'next/link';
+import { ThemeToggle } from '@/components/theme-toggle';
 import type { ScanRecord, Verdict, Page } from './types';
 
 // ---------- Helpers ----------
@@ -122,6 +124,7 @@ export function TopNav({ page, onNav, userEmail, onLogout }: {
   return (
     <nav className="topnav">
       <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
+        <Link href="/" className="nav-home-link">&#8592; Home</Link>
         <Logo />
         <span className="badge badge-neutral" style={{ marginLeft: 4 }}>v1.4.2</span>
       </div>
@@ -137,6 +140,7 @@ export function TopNav({ page, onNav, userEmail, onLogout }: {
         ))}
       </div>
       <div className="nav-right">
+        <ThemeToggle variant="dashboard" />
         <UserMenu userEmail={userEmail} onNav={onNav} onLogout={onLogout} />
       </div>
     </nav>

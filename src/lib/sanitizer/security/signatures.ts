@@ -1,4 +1,4 @@
-export const INJECTION_SIGNATURES: RegExp[] = [
+const INJECTION_SIGNATURES: RegExp[] = [
   /ignore\s+(all\s+)?(previous|prior|above)\s+(instructions?|rules?|prompt)/i,
   /you\s+are\s+now\s+(in\s+)?(developer|dev|god|admin|jailbreak|unrestricted)\s+mode/i,
   /\[?\s*system\s*\]?\s*:/i,

@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { listAudit } from "@/lib/auditLog";
+import { listAudit, listAuditSince } from "@/lib/auditLog";
 import { checkRate } from "@/lib/rateLimit";
 import { logger } from "@/lib/logger";
 import { inc } from "@/lib/metrics";
@@ -75,7 +75,23 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
 
     inc("sentry_stats_requests_total");
 
-    const all = listAudit(undefined);
+    const rangeParam = request.nextUrl.searchParams.get("range");
+    const validRanges = ["24h", "7d", "30d", "all"] as const;
+    type Range = (typeof validRanges)[number];
+    const range: Range = (validRanges as readonly string[]).includes(rangeParam ?? "")
+      ? (rangeParam as Range)
+      : "all";
+
+    const now = Date.now();
+    const DAY_MS = 24 * 60 * 60 * 1000;
+    const all =
+      range === "all"
+        ? listAudit(undefined)
+        : range === "24h"
+          ? listAuditSince(now - DAY_MS)
+          : range === "7d"
+            ? listAuditSince(now - 7 * DAY_MS)
+            : listAuditSince(now - 30 * DAY_MS);
 
     // Verdict counts
     const totals = { all: all.length, allow: 0, warn: 0, block: 0, error: 0 };
@@ -114,8 +130,23 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
     const layer3EnabledCount = all.filter((e) => e.layer3Enabled === true).length;
     const generatedAt = new Date().toISOString();
 
+    function pctOf(arr: number[], p: number) {
+      return arr.length === 0 ? 0 : arr[Math.floor(arr.length * p)];
+    }
+    function avgOf(arr: number[]) {
+      return arr.length === 0 ? 0 : Math.round(arr.reduce((a, b) => a + b, 0) / arr.length);
+    }
+
+    const l1Values = all.filter(e => typeof e.layer1Ms === "number").map(e => e.layer1Ms as number).sort((a, b) => a - b);
+    const l2Values = all.filter(e => typeof e.layer2Ms === "number").map(e => e.layer2Ms as number).sort((a, b) => a - b);
+
+    const latencyByLayer = {
+      layer1: { avgMs: avgOf(l1Values), p50Ms: pctOf(l1Values, 0.5) },
+      layer2: { avgMs: avgOf(l2Values), p50Ms: pctOf(l2Values, 0.5) },
+    };
+
     return NextResponse.json(
-      { totals, latency: { avgMs, p50Ms, p95Ms }, threats, layer3EnabledCount, generatedAt },
+      { totals, latency: { avgMs, p50Ms, p95Ms }, latencyByLayer, threats, layer3EnabledCount, generatedAt, range },
       {
         headers: {
           ...corsHeaders(origin),

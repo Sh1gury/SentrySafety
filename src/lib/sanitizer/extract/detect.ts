@@ -40,7 +40,7 @@ export function detectMime(buf: Buffer): string | null {
   return null;
 }
 
-export function mimeFromExtension(filename: string): string | null {
+function mimeFromExtension(filename: string): string | null {
   const ext = filename.split(".").pop()?.toLowerCase() ?? "";
   return EXT_TO_MIME[ext] ?? null;
 }

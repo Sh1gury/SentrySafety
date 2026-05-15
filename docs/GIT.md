@@ -84,3 +84,23 @@ git commit -m "[A] feat: description"
 git push origin main
 git branch -d zone-a/my-feature
 ```
+
+## Applying migrations
+
+Migrations live in `supabase/migrations/` and are timestamped (`YYYYMMDDHHMMSS_*.sql`). They are **not** auto-applied — apply them by hand before merging code that depends on the new schema.
+
+### Option 1 — Supabase Dashboard (default)
+
+1. Open the project in the Supabase dashboard, then **SQL Editor → New query**.
+2. Paste the full contents of the migration file (e.g. `supabase/migrations/20260515000000_user_settings.sql`).
+3. Click **Run**. Confirm the policies/tables appear under **Database → Tables / Policies**.
+
+### Option 2 — Supabase CLI (if installed and linked)
+
+```bash
+supabase db push
+```
+
+This applies every pending migration in `supabase/migrations/` to the linked remote project. Requires `supabase login` and `supabase link --project-ref <ref>` to have been run once.
+
+Never edit a migration that has already been applied to a shared environment — write a new one instead.

@@ -257,6 +257,8 @@ export async function POST(request: NextRequest): Promise<NextResponse<SanitizeR
       layer2Verdict: layer2.verdict,
       layer3Enabled: layer3.enabled,
       latencyMs,
+      layer1Ms: l1ms,
+      layer2Ms: l2ms,
       inputLength,
       threatsBlocked: { ...layer1.threats_blocked },
     });

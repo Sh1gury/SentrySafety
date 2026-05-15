@@ -15,6 +15,8 @@ export interface AuditEntry {
   layer2Verdict?: "allow" | "warn" | "block";
   layer3Enabled?: boolean;
   latencyMs?: number;
+  layer1Ms?: number;
+  layer2Ms?: number;
   inputLength: number;
   threatsBlocked?: Record<string, number>;
 }
@@ -37,6 +39,18 @@ export function listAudit(limit?: number): AuditEntry[] {
     return reversed.slice(0, limit);
   }
   return reversed;
+}
+
+export function listAuditSince(sinceMs: number): AuditEntry[] {
+  // newest first; only entries with ts >= sinceMs
+  const out: AuditEntry[] = [];
+  for (let i = buffer.length - 1; i >= 0; i--) {
+    const entry = buffer[i];
+    if (new Date(entry.ts).getTime() >= sinceMs) {
+      out.push(entry);
+    }
+  }
+  return out;
 }
 
 export function auditCount(): number {

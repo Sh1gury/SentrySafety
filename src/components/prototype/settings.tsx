@@ -2,10 +2,11 @@
 
 import { useState } from 'react';
 import { PageHeader, Toggle, classNames } from './shared';
+import { getDemoApiKey } from './apiKey';
 import type { ScanConfig } from './types';
 
-const FAKE_API_KEY = 'sk-sentry-a7f2d3e1b5c9084f2a3d6e1b';
-const API_ENDPOINT = 'https://api.sentrysafety.io/v1/scan';
+const DEMO_API_KEY = getDemoApiKey();
+const API_ENDPOINT = '/api/v1/sanitize';
 
 export function SettingsPage({
   config,
@@ -81,17 +82,17 @@ export function SettingsPage({
               </div>
             </div>
             <div>
-              <label className="label">API Key</label>
+              <label className="label">API Key (demo)</label>
               <div className="api-key-row">
                 <div className="api-key-field">
-                  {keyVisible ? FAKE_API_KEY : FAKE_API_KEY.slice(0, 10) + '•'.repeat(16)}
+                  {keyVisible ? DEMO_API_KEY : DEMO_API_KEY.slice(0, 10) + '•'.repeat(16)}
                 </div>
                 <button className="btn btn-sm" onClick={() => setKeyVisible(v => !v)}>
                   {keyVisible ? 'Hide' : 'Reveal'}
                 </button>
                 <button
                   className={classNames('btn btn-sm', copied === 'key' && 'btn-primary')}
-                  onClick={() => copy(FAKE_API_KEY, 'key')}
+                  onClick={() => copy(DEMO_API_KEY, 'key')}
                 >
                   {copied === 'key' ? '✓ Copied' : 'Copy'}
                 </button>

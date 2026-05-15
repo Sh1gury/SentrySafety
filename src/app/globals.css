@@ -732,6 +732,12 @@ tr.row-warn td:first-child { border-left: 2px solid var(--warn); }
 .lp-nav-link:hover { color: var(--lp-text-1); }
 .lp-footer-link { color: var(--lp-text-3); text-decoration: none; transition: color 0.15s; }
 .lp-footer-link:hover { color: var(--lp-text-2); }
+.lp-sidebar-link { color: var(--lp-text-2); text-decoration: none; transition: color 0.15s; display: block; }
+.lp-sidebar-link:hover { color: var(--lp-text-1); }
+.lp-sidebar-sub { color: var(--lp-text-3); text-decoration: none; transition: color 0.15s; display: block; }
+.lp-sidebar-sub:hover { color: var(--lp-text-2); }
+.lp-section-title { color: var(--lp-text-1); border-color: var(--lp-border-light); }
+.lp-strong { color: var(--lp-text-1); font-weight: 600; }
 .lp-btn-primary {
   display: inline-flex; align-items: center;
   background-color: var(--lp-btn-primary-bg); color: var(--lp-btn-primary-color);

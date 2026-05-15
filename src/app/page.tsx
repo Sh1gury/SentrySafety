@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { ThemeToggle } from "@/components/theme-toggle";
+import { SiteFooter } from "@/components/site-footer";
 
 const INSTALL_SNIPPET = `npm install @sentry-safety/sdk`;
 
@@ -75,9 +76,6 @@ export default function Home() {
             <Link href="/docs" className="lp-nav-link transition-colors">
               Docs
             </Link>
-            <Link href="/docs#api" className="lp-nav-link transition-colors">
-              API
-            </Link>
             <ThemeToggle variant="landing" />
             <Link
               href="/dashboard"
@@ -96,9 +94,9 @@ export default function Home() {
             Pre-RAG Firewall
           </span>
           <h1 className="lp-text-1 text-5xl font-semibold leading-tight tracking-tight mb-6">
-            PII never reaches
+            Sanitise before
             <br />
-            the LLM.
+            you vectorise.
           </h1>
           <p className="lp-text-2 text-lg leading-relaxed mb-8 max-w-xl">
             Sentry Safety is a B2B middleware that scans, sanitises, and
@@ -245,23 +243,7 @@ export default function Home() {
         </div>
       </section>
 
-      {/* Footer */}
-      <footer className="lp-border-light border-t">
-        <div className="max-w-6xl mx-auto px-6 py-6 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 text-xs lp-text-3">
-          <span>Sentry Safety &mdash; Infomatrix 2026</span>
-          <div className="flex gap-4">
-            <Link href="/docs" className="lp-footer-link transition-colors">
-              Docs
-            </Link>
-            <Link href="/docs#api" className="lp-footer-link transition-colors">
-              API
-            </Link>
-            <Link href="/docs#sdk" className="lp-footer-link transition-colors">
-              SDK
-            </Link>
-          </div>
-        </div>
-      </footer>
+      <SiteFooter />
     </div>
   );
 }

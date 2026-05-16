@@ -167,10 +167,10 @@ export function ScanPage({ config, setConfig, addScan }: ScanPageProps) {
 
             <div className="preset-row">
               <span className="mono" style={{ fontSize: 10, color: 'var(--text3)', alignSelf: 'center', marginRight: 4 }}>SAMPLES</span>
-              <button className="preset-btn" onClick={() => setText(PRESETS.pii)}>PII heavy</button>
-              <button className="preset-btn" onClick={() => setText(PRESETS.injection)}>Prompt injection</button>
-              <button className="preset-btn" onClick={() => setText(PRESETS.mixed)}>Mixed attack</button>
-              <button className="preset-btn" onClick={() => setText(PRESETS.clean)}>Clean text</button>
+              <button className="preset-btn" onClick={() => { setText(PRESETS.pii); setFile(null); }}>PII heavy</button>
+              <button className="preset-btn" onClick={() => { setText(PRESETS.injection); setFile(null); }}>Prompt injection</button>
+              <button className="preset-btn" onClick={() => { setText(PRESETS.mixed); setFile(null); }}>Mixed attack</button>
+              <button className="preset-btn" onClick={() => { setText(PRESETS.clean); setFile(null); }}>Clean text</button>
             </div>
 
             <div className="preset-row" style={{ marginTop: 8 }}>
@@ -432,6 +432,33 @@ function ResultBlock({ result }: { result: ScanRecord }) {
           </div>
         </>
       )}
+
+      <Collapsible
+        title={<>Sanitized output <span className={`badge ${result.clean_text.trim() ? 'badge-allow' : 'badge-block'}`} style={{ marginLeft: 8 }}>{result.clean_text.trim() ? 'SAFE TO FORWARD' : 'FULLY REMOVED'}</span></>}
+        defaultOpen={true}
+      >
+        {result.clean_text.trim() ? (
+          <pre style={{
+            fontFamily: 'var(--mono)',
+            fontSize: 12,
+            lineHeight: 1.6,
+            whiteSpace: 'pre-wrap',
+            wordBreak: 'break-word',
+            color: 'var(--text2)',
+            margin: 0,
+          }}>
+            {result.clean_text.split(/(\[[A-Z_]+_\d+\])/g).map((part, i) =>
+              /^\[[A-Z_]+_\d+\]$/.test(part)
+                ? <span key={i} style={{ color: 'var(--accent)', fontWeight: 600 }}>{part}</span>
+                : part
+            )}
+          </pre>
+        ) : (
+          <div style={{ fontSize: 12, fontFamily: 'var(--mono)', color: 'var(--text3)', fontStyle: 'italic' }}>
+            All content was removed — the input consisted entirely of detected threats. Nothing is safe to forward to the LLM.
+          </div>
+        )}
+      </Collapsible>
 
       {Object.keys(result.tokenMap || {}).length > 0 && (
         <Collapsible

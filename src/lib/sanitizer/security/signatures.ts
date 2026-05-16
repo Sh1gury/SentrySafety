@@ -1,5 +1,5 @@
 const INJECTION_SIGNATURES: RegExp[] = [
-  /ignore\s+(all\s+)?(previous|prior|above)\s+(instructions?|rules?|prompt)/i,
+  /ig(?:nor|ron)e\s+(?:all(?:\s+\w+){0,2}\s+)?(previous|prior|above|preceding)(?:\s+\w+){0,2}\s+(instructions?|rules?|prompt)/i,
   /you\s+are\s+now\s+(in\s+)?(developer|dev|god|admin|jailbreak|unrestricted)\s+mode/i,
   /\[?\s*system\s*\]?\s*:/i,
   /act\s+as\s+(if\s+you\s+are\s+)?(a\s+)?(different|new|another|unrestricted|evil|uncensored)\s+(AI|assistant|model|bot|system|LLM)/i,
@@ -27,7 +27,7 @@ const INJECTION_SIGNATURES: RegExp[] = [
   /your\s+(true|real|hidden|actual)\s+(self|purpose|goal|identity|instructions?)/i,
   /\bsudo\s+(mode|override|access)\b/i,
   /\badmin\s+override\b/i,
-  /(dump|reveal|print|show|output|display|leak)\s+(all\s+)?(stored\s+)?(client\s+)?(API\s+keys?|credentials?|secrets?|passwords?|tokens?|system\s+prompt)/i,
+  /(dump|reveal|print|show|output|display|leak)(?:\s+\S+){0,7}\s+(API[\s_]keys?|credentials?|secrets?|passwords?|tokens?|system\s+prompt)/i,
   /forget\s+(what|everything)\s+(you\s+)?(were|have\s+been)\s+(told|taught|instructed|given)/i,
 ];
 

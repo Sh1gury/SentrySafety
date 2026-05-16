@@ -24,6 +24,7 @@ function luhnCheck(num: string): boolean {
   return sum % 10 === 0;
 }
 
+// Kept for potential future use (e.g. trust-score weighting), not used for masking.
 function ibanCheck(raw: string): boolean {
   const iban = raw.replace(/\s/g, "").toUpperCase();
   if (iban.length < 15 || iban.length > 34) return false;
@@ -45,8 +46,9 @@ interface PatternDef {
 const PATTERNS: PatternDef[] = [
   {
     type: "IBAN",
-    re: /\b[A-Z]{2}\d{2}[\s]?[A-Z0-9]{4}(?:[\s]?[A-Z0-9]{4}){2,7}(?:[\s]?[A-Z0-9]{1,4})?\b/g,
-    validate: ibanCheck,
+    // Checksum validation removed intentionally: a security product must mask
+    // anything that structurally resembles an IBAN (false negative > false positive).
+    re: /\b[A-Z]{2}\d{2}[\s]?[A-Z0-9]{4}(?:[\s]?[A-Z0-9]{4}){2,6}(?:[\s]?[A-Z0-9]{1,4})?\b/g,
   },
   {
     type: "CREDIT_CARD",

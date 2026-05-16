@@ -66,6 +66,7 @@ export function mapResponseToRecord(
     bytes: src.file ? src.file.size : src.text.length,
     filename: src.file?.name,
     preview,
+    clean_text: response.clean_text,
     tokenMap,
     piiHits,
     layer1: response.metadata.layer1,

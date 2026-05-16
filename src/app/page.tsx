@@ -30,7 +30,7 @@ const layers = [
     number: "02",
     label: "ML Detector",
     description:
-      "PyTorch immune system trained on 4 attack types: backdoor, label-flip, clean-label, and feature corruption. Runs on a dedicated HuggingFace Space — evaluates a trust_weight per document and blocks anything below threshold before it touches your pipeline.",
+      "Fine-tuned transformer classifier (Denis ML) running on a dedicated HuggingFace Space. Detects rephrased and semantically disguised prompt injection that signature matching misses. Falls back to a deterministic shim when DEMO_MODE is set.",
     tag: "Neural network",
     tagStyle: "bg-sky-50 text-sky-700 border border-sky-200",
   },
@@ -132,14 +132,6 @@ export default function Home() {
             </span>
             <code className="lp-code-inline font-mono text-sm border rounded-md px-4 py-2 select-all">
               npm install @sentry-safety/sdk
-            </code>
-          </div>
-          <div className="flex items-center gap-3">
-            <span className="lp-text-3 text-xs font-medium uppercase tracking-widest shrink-0">
-              Python
-            </span>
-            <code className="lp-code-inline font-mono text-sm border rounded-md px-4 py-2 select-all">
-              pip install sentry-safety
             </code>
           </div>
         </div>

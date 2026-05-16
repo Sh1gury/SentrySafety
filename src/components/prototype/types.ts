@@ -21,6 +21,7 @@ export interface ScanRecord {
   bytes: number;
   filename?: string;
   preview: string;
+  clean_text: string;
   tokenMap: Record<string, string>;
   piiHits?: PiiHit[];
   layer1: Layer1Report;

@@ -5,9 +5,9 @@ export async function extractPdfText(
 ): Promise<{ text: string; security: PdfSecurityReport }> {
   const { PDFParse } = await import("pdf-parse");
   const uint8 = new Uint8Array(buf.buffer, buf.byteOffset, buf.byteLength);
-  const parser = new PDFParse(uint8);
+  const parser = new PDFParse({ data: uint8 });
   const result = await parser.getText();
-  const baseText = typeof result === "string" ? result : String(result);
+  const baseText = result.text;
 
   const security = scanPdfBytes(buf);
 

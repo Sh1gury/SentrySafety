@@ -152,7 +152,9 @@ export async function runLayer1(req: SanitizeRequest): Promise<Layer1Result> {
   let removedParagraphs = 0;
 
   if (cfg.security.block_injections) {
-    const paragraphs = rawText.split(/\n{2,}/);
+    // Split on any newline boundary so single-newline PDF text is checked
+    // line-by-line rather than as one monolithic paragraph.
+    const paragraphs = rawText.split(/\n+/).filter((l) => l.trim() !== "");
     const safe: string[] = [];
     for (const para of paragraphs) {
       if (containsInjection(para)) {
@@ -162,7 +164,7 @@ export async function runLayer1(req: SanitizeRequest): Promise<Layer1Result> {
         safe.push(para);
       }
     }
-    workText = safe.join("\n\n");
+    workText = safe.join("\n");
   }
 
   // ── 3. PII masking ────────────────────────────────────────────────────────

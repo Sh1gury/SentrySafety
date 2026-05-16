@@ -78,6 +78,32 @@ try {
   }
 }`;
 
+const TRAINING_SDK_DATASET = `# pip install sentry-safety-ml
+
+from sentry_safety_ml import ImmuneSupervisor
+
+supervisor = ImmuneSupervisor(api_key="sk_live_...")
+
+# Pass a raw list of text samples, dicts, or a HuggingFace Dataset.
+# Returns only samples whose trust_weight exceeds the detection threshold.
+clean_dataset = supervisor.sanitize_training_data(raw_dataset)
+
+# Train only on verified samples — the model cannot be backdoored.
+my_pytorch_model.train(clean_dataset)`;
+
+const TRAINING_SDK_BATCH = `import torch
+from sentry_safety_ml import ImmuneSupervisor
+
+supervisor = ImmuneSupervisor(api_key="sk_live_...")
+
+for batch in dataloader:
+    # trust_weights: per-sample confidence tensor, shape [batch_size], range 0..1
+    clean_batch, trust_weights = supervisor.sanitize_batch(batch)
+
+    loss = model(clean_batch)
+    # Poisoned samples contribute near-zero gradient — no explicit filtering needed.
+    (loss * trust_weights.mean()).backward()`;
+
 const threats: { type: string; layer: string; description: string }[] = [
   {
     type: "prompt_injection",
@@ -93,9 +119,9 @@ const threats: { type: string; layer: string; description: string }[] = [
   },
   {
     type: "data_poisoning",
-    layer: "Layer 2",
+    layer: "ML Detector + Layer 2",
     description:
-      "Contradictions and planted facts designed to corrupt downstream answers. Caught by the logic agent.",
+      "Backdoor triggers and planted contradictions designed to corrupt model weights or downstream answers. A PyTorch immune system evaluates per-document trust weights before Layer 2 logic agent analysis.",
   },
   {
     type: "zip_bomb",
@@ -188,6 +214,9 @@ export default function DocsPage() {
             <a href="#sdk" className="hover:text-zinc-900 transition-colors">
               SDK
             </a>
+            <a href="#training" className="hover:text-zinc-900 transition-colors">
+              Training SDK
+            </a>
             <a href="#threats" className="hover:text-zinc-900 transition-colors">
               Threats
             </a>
@@ -214,6 +243,9 @@ export default function DocsPage() {
               ["#sdk", "SDK Reference"],
               ["#sdk-class", "— SentrySafety"],
               ["#sdk-errors", "— Error model"],
+              ["#training", "Training SDK"],
+              ["#training-dataset", "— Dataset level"],
+              ["#training-batch", "— Batch level"],
               ["#threats", "Threat Catalogue"],
             ].map(([href, label]) => (
               <a
@@ -408,6 +440,56 @@ export default function DocsPage() {
                   </p>
                 ))}
               </div>
+            </div>
+          </Section>
+
+          {/* Training SDK */}
+          <Section id="training" title="Training Protection SDK">
+            <p className="text-zinc-500 text-sm mb-5 leading-relaxed">
+              For teams training or fine-tuning LLMs from scratch. The{" "}
+              <code className="bg-zinc-100 px-1.5 py-0.5 rounded text-xs font-mono text-zinc-800">
+                ImmuneSupervisor
+              </code>{" "}
+              module wraps a PyTorch-based data-poisoning detector that assigns a
+              per-sample{" "}
+              <code className="bg-zinc-100 px-1.5 py-0.5 rounded text-xs font-mono text-zinc-800">
+                trust_weight
+              </code>{" "}
+              before a sample influences model weights. The same underlying model
+              powers the runtime{" "}
+              <code className="bg-zinc-100 px-1.5 py-0.5 rounded text-xs font-mono text-zinc-800">
+                /api/v1/sanitize
+              </code>{" "}
+              endpoint — one subscription protects both inference-time RAG ingestion
+              and training-time dataset curation.
+            </p>
+
+            <div className="mb-6 rounded-xl border border-zinc-200 bg-zinc-50 px-5 py-4 text-sm">
+              <p className="mb-1 text-xs font-medium uppercase tracking-wide text-zinc-400">
+                Threat scenario
+              </p>
+              <p className="text-zinc-700">
+                You are fine-tuning LLaMA or Mistral on a proprietary corpus. An
+                adversary has injected backdoor triggers into 0.3 % of samples.
+                Without filtering, those samples corrupt the model&apos;s weights
+                permanently. The ImmuneSupervisor catches them before the first
+                gradient step.
+              </p>
+            </div>
+
+            <div id="training-dataset" className="scroll-mt-20 mb-8">
+              <h3 className="font-semibold text-zinc-800 mb-3">Dataset-level sanitization</h3>
+              <CodeBlock code={TRAINING_SDK_DATASET} />
+            </div>
+
+            <div id="training-batch" className="scroll-mt-20">
+              <h3 className="font-semibold text-zinc-800 mb-3">Batch-level weighted training</h3>
+              <p className="text-zinc-500 text-sm mb-3">
+                Keeps poisoned samples in the batch but down-weights their gradient
+                contribution — useful when you cannot afford to remove samples from
+                a small corpus.
+              </p>
+              <CodeBlock code={TRAINING_SDK_BATCH} />
             </div>
           </Section>
 

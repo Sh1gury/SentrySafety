@@ -12,14 +12,23 @@ export function SettingsPage({
   config,
   setConfig,
   userEmail,
+  displayName,
+  setDisplayName,
+  save,
+  saving,
+  savedAt,
 }: {
   config: ScanConfig;
-  setConfig: (c: ScanConfig) => void;
+  setConfig: React.Dispatch<React.SetStateAction<ScanConfig>>;
   userEmail: string;
+  displayName: string | null;
+  setDisplayName: (name: string | null) => void;
+  save: () => Promise<void>;
+  saving: boolean;
+  savedAt: number | null;
 }) {
   const [keyVisible, setKeyVisible] = useState(false);
   const [copied, setCopied] = useState<string | null>(null);
-  const [saved, setSaved] = useState(false);
 
   function copy(text: string, id: string) {
     navigator.clipboard.writeText(text).catch(() => {});
@@ -27,10 +36,8 @@ export function SettingsPage({
     setTimeout(() => setCopied(null), 1800);
   }
 
-  function savePolicy() {
-    setSaved(true);
-    setTimeout(() => setSaved(false), 2000);
-  }
+  // Show "Saved" for 2s after a successful save (savedAt drives this).
+  const saved = savedAt !== null;
 
   const initial = userEmail.charAt(0).toUpperCase();
 
@@ -57,7 +64,9 @@ export function SettingsPage({
             <label className="label">Display name</label>
             <input
               className="input"
-              defaultValue={userEmail.split('@')[0]}
+              value={displayName ?? ''}
+              onChange={e => setDisplayName(e.target.value)}
+              placeholder={userEmail.split('@')[0]}
               style={{ maxWidth: 320 }}
             />
           </div>
@@ -151,8 +160,8 @@ export function SettingsPage({
           </div>
 
           <div style={{ marginTop: 20, display: 'flex', gap: 10, alignItems: 'center' }}>
-            <button className="btn btn-primary" onClick={savePolicy}>
-              {saved ? '✓ Saved' : 'Save changes'}
+            <button className="btn btn-primary" onClick={() => { void save(); }} disabled={saving}>
+              {saving ? 'Saving…' : saved ? '✓ Saved' : 'Save changes'}
             </button>
             {saved && <span style={{ fontSize: 12, color: 'var(--accent)' }}>Policy updated for all new scans.</span>}
           </div>

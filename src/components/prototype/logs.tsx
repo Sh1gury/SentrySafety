@@ -2,38 +2,142 @@
 
 import { useState, useMemo, useEffect } from 'react';
 import { classNames, formatRelTime, VerdictBadge, Badge, PageHeader } from './shared';
-import type { ScanRecord } from './types';
+import { useAudit, type AuditRange, type AuditVerdictFilter } from './useAudit';
+import { useScan } from './useScan';
+import type { ScanRecord, ScanConfig, Verdict } from './types';
+import type { AuditEntry } from '@/lib/auditLog';
 
-export function LogsPage({ scans }: { scans: ScanRecord[] }) {
+// Reduced-detail row backed by a server-side audit record (no preview, no token map).
+interface ServerRow {
+  source: 'server';
+  id: string;
+  ts: number;
+  verdict: Verdict;
+  kind: string;
+  pii: number;
+  threats: number;
+  threatList: string[];
+  latency: number;
+  bytes: number;
+  raw: AuditEntry;
+}
+
+interface SessionRow {
+  source: 'session';
+  scan: ScanRecord;
+}
+
+type Row = SessionRow | ServerRow;
+
+function auditToRow(e: AuditEntry): ServerRow | null {
+  // Skip rows that aren't a real verdict (e.g. "error") — those would break VerdictBadge.
+  if (e.verdict !== 'allow' && e.verdict !== 'warn' && e.verdict !== 'block') return null;
+  const threatsBlocked = e.threatsBlocked ?? {};
+  const threatList = Object.entries(threatsBlocked)
+    .filter(([, c]) => typeof c === 'number' && c > 0)
+    .map(([k]) => k);
+  const threats = threatList.reduce((sum, k) => sum + (threatsBlocked[k] ?? 0), 0);
+  return {
+    source: 'server',
+    id: e.scanId,
+    ts: new Date(e.ts).getTime(),
+    verdict: e.verdict,
+    kind: 'server',
+    pii: 0,
+    threats,
+    threatList,
+    latency: e.latencyMs ?? 0,
+    bytes: e.inputLength,
+    raw: e,
+  };
+}
+
+function rowId(r: Row): string {
+  return r.source === 'session' ? r.scan.id : r.id;
+}
+function rowTs(r: Row): number {
+  return r.source === 'session' ? r.scan.ts : r.ts;
+}
+function rowVerdict(r: Row): Verdict {
+  return r.source === 'session' ? r.scan.verdict : r.verdict;
+}
+function rowKind(r: Row): string {
+  return r.source === 'session' ? r.scan.kind : r.kind;
+}
+function rowPii(r: Row): number {
+  return r.source === 'session' ? r.scan.pii : r.pii;
+}
+function rowThreatList(r: Row): string[] {
+  return r.source === 'session' ? (r.scan.threatList || []) : r.threatList;
+}
+function rowLatency(r: Row): number {
+  return r.source === 'session' ? r.scan.latency : r.latency;
+}
+function rowSearchHaystack(r: Row): string {
+  if (r.source === 'session') {
+    return [r.scan.id, r.scan.filename ?? '', r.scan.preview ?? ''].join(' ').toLowerCase();
+  }
+  return r.id.toLowerCase();
+}
+
+export function LogsPage({
+  scans,
+  addScan,
+  config,
+}: {
+  scans: ScanRecord[];
+  addScan: (s: ScanRecord) => void;
+  config: ScanConfig;
+}) {
   const [search, setSearch] = useState('');
-  const [verdictFilter, setVerdictFilter] = useState('all');
+  const [verdictFilter, setVerdictFilter] = useState<AuditVerdictFilter>('all');
   const [typeFilter, setTypeFilter] = useState('all');
+  const [rangeFilter, setRangeFilter] = useState<AuditRange>('all');
   const [selected, setSelected] = useState<ScanRecord | null>(null);
 
+  const { serverEntries, total: serverTotal } = useAudit({
+    range: rangeFilter,
+    verdict: verdictFilter,
+  });
+
+  const merged: Row[] = useMemo(() => {
+    const sessionIds = new Set(scans.map(s => s.id));
+    const sessionRows: SessionRow[] = scans.map(s => ({ source: 'session', scan: s }));
+    const serverRows: ServerRow[] = [];
+    for (const e of serverEntries) {
+      if (sessionIds.has(e.scanId)) continue;
+      const row = auditToRow(e);
+      if (row) serverRows.push(row);
+    }
+    return [...sessionRows, ...serverRows].sort((a, b) => rowTs(b) - rowTs(a));
+  }, [scans, serverEntries]);
+
   const filtered = useMemo(() => {
-    return scans.filter(s => {
-      if (verdictFilter !== 'all' && s.verdict !== verdictFilter) return false;
-      if (typeFilter !== 'all' && s.kind.toLowerCase() !== typeFilter) return false;
+    return merged.filter(r => {
+      if (verdictFilter !== 'all' && rowVerdict(r) !== verdictFilter) return false;
+      if (typeFilter !== 'all' && rowKind(r).toLowerCase() !== typeFilter) return false;
       if (search) {
         const q = search.toLowerCase();
-        if (!s.id.toLowerCase().includes(q)
-          && !(s.filename || '').toLowerCase().includes(q)
-          && !(s.preview || '').toLowerCase().includes(q)) return false;
+        if (!rowSearchHaystack(r).includes(q)) return false;
       }
       return true;
     });
-  }, [scans, search, verdictFilter, typeFilter]);
+  }, [merged, search, verdictFilter, typeFilter]);
+
+  // Y = total visible records (session + de-duped server). Server "total" is the
+  // upper bound from the API; we combine to give a single "of" denominator.
+  const totalDenominator = Math.max(merged.length, scans.length + serverTotal);
 
   function exportCsv() {
     const headers = ['scan_id', 'timestamp', 'kind', 'verdict', 'pii_count', 'threats', 'latency_ms'];
-    const rows = filtered.map(s => [
-      s.id,
-      new Date(s.ts).toISOString(),
-      s.kind,
-      s.verdict,
-      s.pii,
-      (s.threatList || []).join(';'),
-      s.latency,
+    const rows = filtered.map(r => [
+      rowId(r),
+      new Date(rowTs(r)).toISOString(),
+      rowKind(r),
+      rowVerdict(r),
+      rowPii(r),
+      rowThreatList(r).join(';'),
+      rowLatency(r),
     ]);
     const csv = [headers, ...rows].map(r => r.join(',')).join('\n');
     const blob = new Blob([csv], { type: 'text/csv' });
@@ -53,7 +157,7 @@ export function LogsPage({ scans }: { scans: ScanRecord[] }) {
         subtitle="All scans in real time. Click a row for full details."
         right={
           <div className="row-flex">
-            <span className="mono" style={{ fontSize: 11, color: 'var(--text3)' }}>{filtered.length} / {scans.length}</span>
+            <span className="mono" style={{ fontSize: 11, color: 'var(--text3)' }}>{filtered.length} / {totalDenominator}</span>
           </div>
         }
       />
@@ -68,7 +172,12 @@ export function LogsPage({ scans }: { scans: ScanRecord[] }) {
             onChange={e => setSearch(e.target.value)}
           />
         </div>
-        <select className="select" style={{ width: 150, flex: '0 0 auto' }} value={verdictFilter} onChange={e => setVerdictFilter(e.target.value)}>
+        <select
+          className="select"
+          style={{ width: 150, flex: '0 0 auto' }}
+          value={verdictFilter}
+          onChange={e => setVerdictFilter(e.target.value as AuditVerdictFilter)}
+        >
           <option value="all">All verdicts</option>
           <option value="allow">allow</option>
           <option value="warn">warn</option>
@@ -81,6 +190,17 @@ export function LogsPage({ scans }: { scans: ScanRecord[] }) {
           <option value="docx">DOCX</option>
           <option value="zip">ZIP</option>
           <option value="txt">TXT</option>
+        </select>
+        <select
+          className="select"
+          style={{ width: 130, flex: '0 0 auto' }}
+          value={rangeFilter}
+          onChange={e => setRangeFilter(e.target.value as AuditRange)}
+        >
+          <option value="all">All time</option>
+          <option value="24h">Last 24h</option>
+          <option value="7d">Last 7 days</option>
+          <option value="30d">Last 30 days</option>
         </select>
         <span style={{ flex: 1 }}></span>
         <button className="btn btn-sm" onClick={exportCsv}>
@@ -110,55 +230,120 @@ export function LogsPage({ scans }: { scans: ScanRecord[] }) {
                   <div style={{ fontSize: 13 }}>No scans match the current filters</div>
                 </td>
               </tr>
-            ) : filtered.map(s => (
-              <tr
-                key={s.id}
-                onClick={() => setSelected(s)}
-                className={classNames(
-                  selected?.id === s.id && 'selected',
-                  s.verdict === 'block' && 'row-block',
-                  s.verdict === 'warn' && 'row-warn',
-                )}
-              >
-                <td className="mono" style={{ color: 'var(--text)' }}>{s.id.replace(/_(\w{6}).*/, '_$1')}</td>
-                <td className="cell-dim" title={new Date(s.ts).toLocaleString()}>{formatRelTime(s.ts)}</td>
-                <td><span className="badge badge-neutral">{s.kind}</span></td>
-                <td><VerdictBadge verdict={s.verdict} /></td>
-                <td className="mono" style={{ textAlign: 'right', color: s.pii > 0 ? 'var(--warn)' : 'var(--text3)' }}>{s.pii}</td>
-                <td>
-                  {(s.threatList || []).length === 0
-                    ? <span className="cell-dim">—</span>
-                    : (s.threatList || []).slice(0, 2).map(t => (
-                        <span key={t} className={s.verdict === 'block' ? 'badge badge-block' : 'badge badge-warn'} style={{ marginRight: 4 }}>{t.replace(/_/g, ' ')}</span>
-                      ))
-                  }
-                  {(s.threatList || []).length > 2 && <span className="cell-dim">+{s.threatList.length - 2}</span>}
-                </td>
-                <td className="mono" style={{ textAlign: 'right' }}>{s.latency} ms</td>
-                <td>
-                  <button className="btn btn-sm" onClick={e => { e.stopPropagation(); setSelected(s); }}>Details</button>
-                </td>
-              </tr>
-            ))}
+            ) : filtered.map(r => {
+              const id = rowId(r);
+              const ts = rowTs(r);
+              const verdict = rowVerdict(r);
+              const kind = rowKind(r);
+              const pii = rowPii(r);
+              const threatList = rowThreatList(r);
+              const latency = rowLatency(r);
+              const isSession = r.source === 'session';
+              const sessionScan = isSession ? r.scan : null;
+              return (
+                <tr
+                  key={id}
+                  onClick={() => sessionScan && setSelected(sessionScan)}
+                  className={classNames(
+                    selected?.id === id && 'selected',
+                    verdict === 'block' && 'row-block',
+                    verdict === 'warn' && 'row-warn',
+                  )}
+                  style={!isSession ? { cursor: 'default' } : undefined}
+                >
+                  <td className="mono" style={{ color: 'var(--text)' }}>
+                    {id.replace(/_(\w{6}).*/, '_$1')}
+                    {!isSession && <span className="badge badge-neutral" style={{ marginLeft: 6, fontSize: 9 }}>Server record</span>}
+                  </td>
+                  <td className="cell-dim" title={new Date(ts).toLocaleString()}>{formatRelTime(ts)}</td>
+                  <td><span className="badge badge-neutral">{kind}</span></td>
+                  <td><VerdictBadge verdict={verdict} /></td>
+                  <td className="mono" style={{ textAlign: 'right', color: pii > 0 ? 'var(--warn)' : 'var(--text3)' }}>{pii}</td>
+                  <td>
+                    {threatList.length === 0
+                      ? <span className="cell-dim">—</span>
+                      : threatList.slice(0, 2).map(t => (
+                          <span key={t} className={verdict === 'block' ? 'badge badge-block' : 'badge badge-warn'} style={{ marginRight: 4 }}>{t.replace(/_/g, ' ')}</span>
+                        ))
+                    }
+                    {threatList.length > 2 && <span className="cell-dim">+{threatList.length - 2}</span>}
+                  </td>
+                  <td className="mono" style={{ textAlign: 'right' }}>{latency} ms</td>
+                  <td>
+                    {sessionScan
+                      ? <button className="btn btn-sm" onClick={e => { e.stopPropagation(); setSelected(sessionScan); }}>Details</button>
+                      : <span className="cell-dim mono" style={{ fontSize: 10 }}>—</span>}
+                  </td>
+                </tr>
+              );
+            })}
           </tbody>
         </table>
       </div>
 
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 14, fontSize: 11, color: 'var(--text3)', fontFamily: 'var(--mono)', letterSpacing: '0.05em' }}>
-        <span>Showing {filtered.length} of {scans.length} records</span>
+        <span>Showing {filtered.length} of {totalDenominator} records</span>
       </div>
 
-      {selected && <ScanDetailSlideout scan={selected} onClose={() => setSelected(null)} />}
+      {selected && (
+        <ScanDetailSlideout
+          scan={selected}
+          onClose={() => setSelected(null)}
+          addScan={addScan}
+          config={config}
+        />
+      )}
     </div>
   );
 }
 
-function ScanDetailSlideout({ scan, onClose }: { scan: ScanRecord; onClose: () => void }) {
+function ScanDetailSlideout({
+  scan,
+  onClose,
+  addScan,
+  config,
+}: {
+  scan: ScanRecord;
+  onClose: () => void;
+  addScan: (s: ScanRecord) => void;
+  config: ScanConfig;
+}) {
+  const [copied, setCopied] = useState(false);
+  const [rerunning, setRerunning] = useState(false);
+  const [rerunError, setRerunError] = useState<string | null>(null);
+  const { runScan } = useScan();
+  // File scans can't be re-run — we never retain the original File handle.
+  const canRerun = scan.kind === 'text';
+
   useEffect(() => {
     function onKey(e: KeyboardEvent) { if (e.key === 'Escape') onClose(); }
     document.addEventListener('keydown', onKey);
     return () => document.removeEventListener('keydown', onKey);
   }, [onClose]);
+
+  async function handleCopyJson() {
+    try {
+      await navigator.clipboard.writeText(JSON.stringify(scan, null, 2));
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1800);
+    } catch {
+      // clipboard may be unavailable in some browsers/contexts; silent.
+    }
+  }
+
+  async function handleRerun() {
+    if (!canRerun || rerunning) return;
+    setRerunning(true);
+    setRerunError(null);
+    try {
+      const next = await runScan(scan.preview, 'text', config);
+      addScan(next);
+    } catch (err) {
+      setRerunError(err instanceof Error ? err.message : 'Re-run failed');
+    } finally {
+      setRerunning(false);
+    }
+  }
 
   return (
     <>
@@ -261,9 +446,25 @@ function ScanDetailSlideout({ scan, onClose }: { scan: ScanRecord; onClose: () =
             </>
           )}
 
-          <div style={{ marginTop: 16, display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
-            <button className="btn btn-sm">Copy JSON</button>
-            <button className="btn btn-sm">Re-run scan</button>
+          {rerunError && (
+            <div style={{ marginTop: 12, fontSize: 12, color: 'var(--danger)' }}>{rerunError}</div>
+          )}
+
+          <div style={{ marginTop: 16, display: 'flex', gap: 8, justifyContent: 'flex-end', alignItems: 'center' }}>
+            {rerunning && (
+              <span className="mono" style={{ fontSize: 11, color: 'var(--text3)' }}>Re-running…</span>
+            )}
+            <button className="btn btn-sm" onClick={handleCopyJson}>
+              {copied ? '✓ Copied' : 'Copy JSON'}
+            </button>
+            <button
+              className="btn btn-sm"
+              onClick={handleRerun}
+              disabled={!canRerun || rerunning}
+              title={canRerun ? undefined : 'Only text scans can be re-run (file handle not retained).'}
+            >
+              Re-run scan
+            </button>
           </div>
         </div>
       </div>

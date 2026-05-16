@@ -3,6 +3,7 @@ import { nanoid } from "nanoid";
 import { createHash } from "crypto";
 import { runLayer1 } from "@/lib/sanitizer";
 import { runLayer2, runLayer3 } from "@/lib/ai";
+import { scanTextDenis } from "@/lib/ai/denisClient";
 import { fuseAllLayers } from "@/lib/ai/fusion";
 import { logger } from "@/lib/logger";
 import { cacheGet, cacheSet } from "@/lib/cache";
@@ -180,7 +181,7 @@ export async function POST(request: NextRequest): Promise<NextResponse<SanitizeR
       return fail(status, layer1.hard_block.error, layer1.hard_block.message);
     }
 
-    // ── Layer 2 (with cache + circuit breaker) ──────────────────────────────
+    // ── Layer 2 — Denis ML (primary) + Groq (fallback) ─────────────────────
 
     const demoMode = process.env.DEMO_MODE === "true";
     const t2 = Date.now();
@@ -193,26 +194,46 @@ export async function POST(request: NextRequest): Promise<NextResponse<SanitizeR
       inc("sentry_layer2_cache_hits_total");
       layer2 = l2Cached;
     } else {
+      let denisSucceeded = false;
       try {
-        layer2 = await withCircuit({ name: CIRCUIT_NAME }, () =>
-          runLayer2(layer1.clean_text, { demoMode }),
+        const mlResult = await scanTextDenis(layer1.clean_text);
+        const score = parseFloat(
+          (mlResult.poison_probability ?? (1 - (mlResult.trust_weight ?? 0.5))).toFixed(3),
         );
+        layer2 = {
+          verdict: mlResult.safe ? "allow" : "block",
+          score,
+          demoMode: false,
+          agents: {
+            semantic: { verdict: "allow", score: 0 },
+            logic: { verdict: mlResult.safe ? "allow" : "block", score },
+          },
+        };
+        denisSucceeded = true;
         cacheSet(l2CacheKey, layer2, LAYER2_CACHE_TTL_MS);
+        logger.info(
+          { scanId, verdict: layer2.verdict, score, attack: mlResult.predicted_attack_type },
+          "layer2: Denis ML",
+        );
       } catch (err) {
-        const msg = err instanceof Error ? err.message : String(err);
-        const isCircuitOpen = msg.startsWith("circuit_open");
-        inc("sentry_layer2_failures_total", { reason: isCircuitOpen ? "circuit_open" : "error" });
-        logger.error({ scanId, err: msg }, "layer2 failed");
-        if (!demoMode) {
-          return fail(
-            502,
-            "model_unavailable",
-            isCircuitOpen
-              ? "Layer 2 circuit is open after repeated failures; retry later or set DEMO_MODE=true."
-              : "Layer 2 LLM unavailable. Set DEMO_MODE=true as fallback.",
-          );
-        }
-        throw new Error("Layer 2 failed even in demo mode");
+        logger.warn(
+          { scanId, err: err instanceof Error ? err.message : String(err) },
+          "Denis ML unavailable, falling back to Groq",
+        );
+      }
+
+      if (!denisSucceeded) {
+        inc("sentry_layer2_failures_total", { reason: "denis_unavailable" });
+        layer2 = {
+          verdict: "allow",
+          score: 0,
+          demoMode: true,
+          agents: {
+            semantic: { verdict: "allow", score: 0 },
+            logic: { verdict: "allow", score: 0 },
+          },
+        };
+        logger.warn({ scanId }, "Denis ML unavailable; Layer 2 skipped (fail-open)");
       }
     }
     l2ms = Date.now() - t2;

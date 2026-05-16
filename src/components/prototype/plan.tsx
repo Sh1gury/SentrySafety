@@ -15,7 +15,11 @@ interface PlanTier {
   ctaDisabled?: boolean;
 }
 
-const PLANS: PlanTier[] = [
+interface PlanTierWithHandler extends PlanTier {
+  onCta?: () => void;
+}
+
+const PLANS: PlanTierWithHandler[] = [
   {
     id: 'starter',
     name: 'Starter',
@@ -46,6 +50,7 @@ const PLANS: PlanTier[] = [
     ],
     highlight: true,
     cta: 'Upgrade to Pro',
+    onCta: () => { window.location.href = 'mailto:sales@sentry.io?subject=Sentry%20Safety%20Pro%20Upgrade&body=I%27d%20like%20to%20upgrade%20to%20the%20Pro%20plan.' },
   },
   {
     id: 'enterprise',
@@ -60,6 +65,7 @@ const PLANS: PlanTier[] = [
       'SSO / SAML',
     ],
     cta: 'Contact sales',
+    onCta: () => { window.location.href = 'mailto:sales@sentry.io?subject=Sentry%20Safety%20Enterprise%20Inquiry' },
   },
 ];
 
@@ -112,6 +118,7 @@ export function PlanPage() {
                 plan.ctaDisabled && 'btn-disabled',
               )}
               disabled={plan.ctaDisabled}
+              onClick={plan.onCta}
               style={{ width: '100%', justifyContent: 'center', marginTop: 4 }}
             >
               {plan.cta}

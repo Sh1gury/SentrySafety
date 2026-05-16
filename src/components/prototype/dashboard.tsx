@@ -28,13 +28,15 @@ export function DashboardPage({ scans }: { scans: ScanRecord[] }) {
 
   const [serverStats, setServerStats] = useState<StatsResponse | null>(null);
   const [serverError, setServerError] = useState<string | null>(null);
+  const [range, setRange] = useState<'24h' | '7d' | '30d' | 'all'>('30d');
 
   useEffect(() => {
     let cancelled = false;
     async function load() {
       try {
-        const r = await fetch('/api/v1/stats', { headers: { 'x-api-key': getDemoApiKey() } });
-        if (!r.ok) throw new Error(`stats ${r.status}`);
+        const r = await fetch(`/api/v1/stats?range=${range}`, { headers: { 'x-api-key': getDemoApiKey() } });
+        // Keep previous data on transient failures; silently retry on next poll.
+        if (!r.ok) return;
         const data = await r.json() as StatsResponse;
         if (!cancelled) {
           setServerStats(data);
@@ -47,7 +49,7 @@ export function DashboardPage({ scans }: { scans: ScanRecord[] }) {
     load();
     const id = setInterval(load, 30_000);
     return () => { cancelled = true; clearInterval(id); };
-  }, []);
+  }, [range]);
 
   const stats = useMemo(() => {
     // Session-local counts — used as fallback and for PII breakdown.
@@ -141,7 +143,12 @@ export function DashboardPage({ scans }: { scans: ScanRecord[] }) {
         subtitle="Overview of all scanned files and requests across your organization"
         right={
           <div className="row-flex">
-            <select className="select btn-sm" style={{ width: 160 }} defaultValue="30d">
+            <select
+              className="select btn-sm"
+              style={{ width: 160 }}
+              value={range}
+              onChange={e => setRange(e.target.value as '24h' | '7d' | '30d' | 'all')}
+            >
               <option value="24h">Last 24 hours</option>
               <option value="7d">Last 7 days</option>
               <option value="30d">Last 30 days</option>

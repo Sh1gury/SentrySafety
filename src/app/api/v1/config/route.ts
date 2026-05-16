@@ -136,7 +136,7 @@ function mergeConfig(partial: Partial<SanitizeConfig>): SanitizeConfig {
   };
 }
 
-export async function GET(_req: NextRequest): Promise<NextResponse> {
+export async function GET(): Promise<NextResponse> {
   try {
     const supabase = await createClient();
     const { data: userData, error: userErr } = await supabase.auth.getUser();

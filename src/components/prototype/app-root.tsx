@@ -8,26 +8,12 @@ import { DashboardPage } from './dashboard';
 import { SettingsPage } from './settings';
 import { PlanPage } from './plan';
 import { logout } from '@/actions/auth';
-import type { ScanRecord, ScanConfig, Page } from './types';
-
-const DEFAULT_CONFIG: ScanConfig = {
-  privacy: {
-    mask_pii: true,
-    entities_to_mask: ['PERSON', 'EMAIL', 'PHONE', 'IBAN', 'CREDIT_CARD'],
-  },
-  security: {
-    block_injections: true,
-    max_decompression_ratio: 100,
-    strip_macros: true,
-  },
-  integrity: {
-    check_autophagy: false,
-  },
-};
+import { useConfig } from './useConfig';
+import type { ScanRecord, Page } from './types';
 
 export default function AppRoot({ initialUser }: { initialUser: string }) {
   const [page, setPage] = useState<Page>('scan');
-  const [config, setConfig] = useState<ScanConfig>(DEFAULT_CONFIG);
+  const { config, setConfig, displayName, setDisplayName, save, saving, savedAt } = useConfig();
   const [scans, setScans] = useState<ScanRecord[]>([]);
 
   async function handleLogout() {
@@ -40,14 +26,29 @@ export default function AppRoot({ initialUser }: { initialUser: string }) {
 
   return (
     <div className="app-shell">
-      <TopNav page={page} onNav={setPage} userEmail={initialUser} onLogout={handleLogout} />
+      <TopNav
+        page={page}
+        onNav={setPage}
+        userEmail={initialUser}
+        displayName={displayName}
+        onLogout={handleLogout}
+      />
       {page === 'scan' && (
         <ScanPage config={config} setConfig={setConfig} addScan={addScan} />
       )}
-      {page === 'logs' && <LogsPage scans={scans} />}
+      {page === 'logs' && <LogsPage scans={scans} addScan={addScan} config={config} />}
       {page === 'dashboard' && <DashboardPage scans={scans} />}
       {page === 'settings' && (
-        <SettingsPage config={config} setConfig={setConfig} userEmail={initialUser} />
+        <SettingsPage
+          config={config}
+          setConfig={setConfig}
+          userEmail={initialUser}
+          displayName={displayName}
+          setDisplayName={setDisplayName}
+          save={save}
+          saving={saving}
+          savedAt={savedAt}
+        />
       )}
       {page === 'plan' && <PlanPage />}
     </div>

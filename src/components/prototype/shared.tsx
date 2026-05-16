@@ -28,14 +28,16 @@ export function Logo({ size = 'sm' }: { size?: 'sm' | 'lg' }) {
 }
 
 // ---------- User Menu ----------
-function UserMenu({ userEmail, onNav, onLogout }: {
+function UserMenu({ userEmail, displayName, onNav, onLogout }: {
   userEmail: string;
+  displayName?: string | null;
   onNav: (p: Page) => void;
   onLogout: () => void;
 }) {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
-  const initial = userEmail.charAt(0).toUpperCase();
+  const shownName = displayName || userEmail.split('@')[0];
+  const initial = (shownName || userEmail).charAt(0).toUpperCase();
 
   useEffect(() => {
     function handleOutside(e: MouseEvent) {
@@ -61,7 +63,7 @@ function UserMenu({ userEmail, onNav, onLogout }: {
           <div className="user-menu-header">
             <div className="user-menu-avatar-lg">{initial}</div>
             <div className="user-menu-info">
-              <div className="user-menu-email">{userEmail}</div>
+              <div className="user-menu-email">{shownName}</div>
               <div className="user-menu-plan">
                 <span className="plan-dot"></span>
                 Starter
@@ -96,10 +98,11 @@ function UserMenu({ userEmail, onNav, onLogout }: {
 }
 
 // ---------- Top Nav ----------
-export function TopNav({ page, onNav, userEmail, onLogout }: {
+export function TopNav({ page, onNav, userEmail, displayName, onLogout }: {
   page: Page;
   onNav: (p: Page) => void;
   userEmail: string;
+  displayName?: string | null;
   onLogout: () => void;
 }) {
   const NAV_LINKS: { id: Page; label: string }[] = [
@@ -126,7 +129,7 @@ export function TopNav({ page, onNav, userEmail, onLogout }: {
         ))}
       </div>
       <div className="nav-right">
-        <UserMenu userEmail={userEmail} onNav={onNav} onLogout={onLogout} />
+        <UserMenu userEmail={userEmail} displayName={displayName} onNav={onNav} onLogout={onLogout} />
       </div>
     </nav>
   );

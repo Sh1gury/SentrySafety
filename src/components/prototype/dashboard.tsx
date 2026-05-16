@@ -11,6 +11,7 @@ interface StatsResponse {
   latencyByLayer: {
     layer1: { avgMs: number; p50Ms: number };
     layer2: { avgMs: number; p50Ms: number };
+    layer3?: { avgMs: number; p50Ms: number; count: number };
   };
   threats: Record<string, number>;
   layer3EnabledCount: number;
@@ -267,8 +268,15 @@ export function DashboardPage({ scans }: { scans: ScanRecord[] }) {
           </div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 14, marginTop: 6 }}>
             <LayerLatencyRow label="Layer 1" sub="PII sanitizer" ms={serverStats?.latencyByLayer?.layer1?.p50Ms ?? null} max={500} color="allow" />
-            <LayerLatencyRow label="Layer 2" sub="LLM ensemble" ms={serverStats?.latencyByLayer?.layer2?.p50Ms ?? null} max={500} color="allow" />
-            <LayerLatencyRow label="Layer 3" sub="AI autophagy" ms={null} disabled />
+            <LayerLatencyRow label="Layer 2" sub="Denis ML classifier" ms={serverStats?.latencyByLayer?.layer2?.p50Ms ?? null} max={1500} color="allow" />
+            <LayerLatencyRow
+              label="Layer 3"
+              sub="AI autophagy"
+              ms={(serverStats?.latencyByLayer?.layer3?.count ?? 0) > 0 ? (serverStats?.latencyByLayer?.layer3?.p50Ms ?? null) : null}
+              max={1500}
+              color="allow"
+              disabled={(serverStats?.latencyByLayer?.layer3?.count ?? 0) === 0}
+            />
           </div>
           <div style={{ borderTop: '1px solid var(--border)', paddingTop: 12, marginTop: 14, display: 'flex', flexDirection: 'column', gap: 8 }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -328,7 +336,7 @@ function LayerLatencyRow({ label, sub, ms, max = 500, color = 'allow', disabled 
           <span style={{ color: 'var(--text3)', fontSize: 12, marginLeft: 8 }}>{sub}</span>
         </span>
         <span className="mono" style={{ fontSize: 12, color: disabled ? 'var(--text3)' : 'var(--accent)' }}>
-          {disabled ? 'disabled' : `avg ${ms} ms`}
+          {disabled ? 'no data yet' : `avg ${ms} ms`}
         </span>
       </div>
       {!disabled && (

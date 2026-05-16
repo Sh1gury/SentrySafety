@@ -136,8 +136,25 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
             piiMaskedCount: row.pii_masked_count,
             threatsBlocked: row.threats_blocked,
           }));
+
+          // Merge in-memory entries (e.g. from unauthenticated demo agent) not already in DB.
+          const dbIds = new Set(data.map((r) => r.scan_id));
+          let memOnly = listAudit(undefined).filter((e) => !dbIds.has(e.scanId));
+          if (!Number.isNaN(sinceMs)) memOnly = memOnly.filter((e) => new Date(e.ts).getTime() >= sinceMs);
+          if (!Number.isNaN(untilMs)) memOnly = memOnly.filter((e) => new Date(e.ts).getTime() <= untilMs);
+          if (verdictFilter) memOnly = memOnly.filter((e) => e.verdict === verdictFilter);
+
+          const merged = [...dbEntries, ...memOnly].sort(
+            (a, b) => new Date(b.ts).getTime() - new Date(a.ts).getTime(),
+          );
+
           return NextResponse.json(
-            { entries: dbEntries, total: count || 0, limit, offset },
+            {
+              entries: merged.slice(offset, offset + limit),
+              total: (count ?? data.length) + memOnly.length,
+              limit,
+              offset,
+            },
             {
               headers: {
                 ...corsHeaders(origin),

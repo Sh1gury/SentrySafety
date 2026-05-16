@@ -17,6 +17,7 @@ export interface AuditEntry {
   latencyMs?: number;
   layer1Ms?: number;
   layer2Ms?: number;
+  layer3Ms?: number;
   inputLength: number;
   kind?: string;
   piiMaskedCount?: number;

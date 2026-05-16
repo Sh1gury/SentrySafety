@@ -8,7 +8,6 @@ import {
 import { PLACEHOLDER_TEXT, PRESETS } from './samples';
 import type { ScanRecord, ScanConfig } from './types';
 import { useScan } from './useScan';
-import { XRayView } from './xray';
 
 const SAMPLE_PDFS: { id: string; label: string; file: string }[] = [
   { id: 'poisoned', label: 'Try: Poisoned vendor PDF', file: 'vendor-quote-poisoned.pdf' },
@@ -30,7 +29,6 @@ export function ScanPage({ config, setConfig, addScan }: ScanPageProps) {
   const [scanStage, setScanStage] = useState(0);
   const [result, setResult] = useState<ScanRecord | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [xray, setXray] = useState<boolean>(false);
   const [loadingSample, setLoadingSample] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { runScan: doScan } = useScan();
@@ -141,8 +139,6 @@ export function ScanPage({ config, setConfig, addScan }: ScanPageProps) {
           <SettingsPanel
             config={config}
             setConfig={setConfig}
-            xray={xray}
-            setXray={setXray}
           />
           <EntitiesPanel
             entities={config.privacy.entities_to_mask}
@@ -160,23 +156,14 @@ export function ScanPage({ config, setConfig, addScan }: ScanPageProps) {
               </div>
             </div>
 
-            {xray ? (
-              <div>
-                <div className="mono" style={{ fontSize: 10, color: 'var(--text3)', marginBottom: 6, letterSpacing: '0.08em' }}>
-                  X-RAY VIEW · hidden characters revealed
-                </div>
-                <XRayView text={text} />
-              </div>
-            ) : (
-              <textarea
-                className="textarea"
-                rows={7}
-                placeholder={'Paste text to scan…\n\nExample: ' + PLACEHOLDER_TEXT}
-                value={text}
-                onChange={e => setText(e.target.value)}
-                disabled={scanning}
-              />
-            )}
+            <textarea
+              className="textarea"
+              rows={7}
+              placeholder={'Paste text to scan…\n\nExample: ' + PLACEHOLDER_TEXT}
+              value={text}
+              onChange={e => setText(e.target.value)}
+              disabled={scanning}
+            />
 
             <div className="preset-row">
               <span className="mono" style={{ fontSize: 10, color: 'var(--text3)', alignSelf: 'center', marginRight: 4 }}>SAMPLES</span>
@@ -294,13 +281,9 @@ export function ScanPage({ config, setConfig, addScan }: ScanPageProps) {
 function SettingsPanel({
   config,
   setConfig,
-  xray,
-  setXray,
 }: {
   config: ScanConfig;
   setConfig: (fn: (c: ScanConfig) => ScanConfig) => void;
-  xray: boolean;
-  setXray: (v: boolean) => void;
 }) {
   function set(path: string, val: boolean) {
     setConfig(c => {
@@ -330,13 +313,6 @@ function SettingsPanel({
           <div className="toggle-desc">Detects AI-generated text to prevent self-replication inside LLM pipelines</div>
         </div>
         <Toggle on={config.integrity.check_autophagy} onChange={v => set('integrity.check_autophagy', v)} />
-      </div>
-      <div className="toggle-row">
-        <div className="toggle-info">
-          <div className="toggle-label">X-Ray view <span className="layer-tag">DEMO</span></div>
-          <div className="toggle-desc">Reveals invisible attacker text: zero-width chars, bidi-overrides, Cyrillic homoglyphs, hidden system prompts</div>
-        </div>
-        <Toggle on={xray} onChange={setXray} />
       </div>
       <div className="divider-line"></div>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: 11.5, fontFamily: 'var(--mono)', color: 'var(--text3)' }}>

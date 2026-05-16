@@ -120,6 +120,7 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
             latencyMs: row.latency_ms,
             layer1Ms: row.layer1_ms,
             layer2Ms: row.layer2_ms,
+            layer3Ms: row.layer3_ms,
             inputLength: row.input_length,
             kind: row.kind,
             piiMaskedCount: row.pii_masked_count,
@@ -177,10 +178,12 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
 
     const l1Values = all.filter(e => typeof e.layer1Ms === "number").map(e => e.layer1Ms as number).sort((a, b) => a - b);
     const l2Values = all.filter(e => typeof e.layer2Ms === "number").map(e => e.layer2Ms as number).sort((a, b) => a - b);
+    const l3Values = all.filter(e => typeof e.layer3Ms === "number").map(e => e.layer3Ms as number).sort((a, b) => a - b);
 
     const latencyByLayer = {
       layer1: { avgMs: avgOf(l1Values), p50Ms: pctOf(l1Values, 0.5) },
       layer2: { avgMs: avgOf(l2Values), p50Ms: pctOf(l2Values, 0.5) },
+      layer3: { avgMs: avgOf(l3Values), p50Ms: pctOf(l3Values, 0.5), count: l3Values.length },
     };
 
     return NextResponse.json(

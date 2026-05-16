@@ -1,5 +1,14 @@
 This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
 
+## Links
+
+Project - https://sentry-safety-ten.vercel.app/
+GitHub - https://github.com/Sh1gury/SentrySafety
+Ai for text - https://huggingface.co/Zonda001/poison-defense-text
+Ai for image - https://huggingface.co/Zonda001/poison-defense-cifar10
+Main AI API (orchestrator, use previous 2) - https://huggingface.co/spaces/Zonda001/poison-defense
+
+
 ## Getting Started
 
 First, run the development server:

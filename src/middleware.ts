@@ -12,8 +12,8 @@ const SECURITY_HEADERS: Record<string, string> = {
   // 'unsafe-eval' is required by React in dev mode (callstack reconstruction).
   // It is intentionally omitted in production.
   'Content-Security-Policy': isDev
-    ? "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self' ws://localhost:* http://localhost:* https://*.groq.com https://*.supabase.co; frame-ancestors 'none'; base-uri 'self'; form-action 'self'"
-    : "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self' https://*.groq.com https://*.supabase.co; frame-ancestors 'none'; base-uri 'self'; form-action 'self'",
+    ? "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self' ws://localhost:* http://localhost:* https://*.hf.space https://api-inference.huggingface.co https://*.supabase.co; frame-ancestors 'none'; base-uri 'self'; form-action 'self'"
+    : "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self' https://*.hf.space https://api-inference.huggingface.co https://*.supabase.co; frame-ancestors 'none'; base-uri 'self'; form-action 'self'",
 }
 
 function applySecurityHeaders(response: NextResponse): NextResponse {

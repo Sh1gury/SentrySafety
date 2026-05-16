@@ -28,10 +28,10 @@ const layers = [
   },
   {
     number: "02",
-    label: "Semantic",
+    label: "ML Detector",
     description:
-      "llama-3.3-70b-versatile on Groq via sandwich prompting. Two parallel agents: semantic (subtle jailbreaks, role-escalation) and logic (data poisoning). Groq only ever sees text already PII-masked by Layer 1.",
-    tag: "LLM ensemble",
+      "PyTorch immune system trained on 4 attack types: backdoor, label-flip, clean-label, and feature corruption. Runs on a dedicated HuggingFace Space — evaluates a trust_weight per document and blocks anything below threshold before it touches your pipeline.",
+    tag: "Neural network",
     tagStyle: "bg-sky-50 text-sky-700 border border-sky-200",
   },
   {
@@ -46,8 +46,8 @@ const layers = [
 
 const features = [
   {
-    title: "PII never reaches the LLM",
-    body: "Layer 1 tokenises names, IBANs, cards, and phones before the document leaves your infrastructure. Groq sees [PERSON_1], not Bogdana.",
+    title: "PII never leaves your infrastructure",
+    body: "Layer 1 tokenises names, IBANs, cards, and phones before the document is analysed. The ML detector sees [PERSON_1], not the real identity.",
   },
   {
     title: "Prompt injection blocked pre-embedding",
@@ -125,13 +125,23 @@ export default function Home() {
 
       {/* Install strip */}
       <section className="lp-alt lp-border-light border-y">
-        <div className="max-w-6xl mx-auto px-6 py-5 flex flex-col sm:flex-row items-start sm:items-center gap-3">
-          <span className="lp-text-3 text-xs font-medium uppercase tracking-widest shrink-0">
-            Install
-          </span>
-          <code className="lp-code-inline font-mono text-sm border rounded-md px-4 py-2 select-all">
-            {INSTALL_SNIPPET}
-          </code>
+        <div className="max-w-6xl mx-auto px-6 py-5 flex flex-col sm:flex-row items-start sm:items-center gap-6">
+          <div className="flex items-center gap-3">
+            <span className="lp-text-3 text-xs font-medium uppercase tracking-widest shrink-0">
+              JS / TS
+            </span>
+            <code className="lp-code-inline font-mono text-sm border rounded-md px-4 py-2 select-all">
+              npm install @sentry-safety/sdk
+            </code>
+          </div>
+          <div className="flex items-center gap-3">
+            <span className="lp-text-3 text-xs font-medium uppercase tracking-widest shrink-0">
+              Python
+            </span>
+            <code className="lp-code-inline font-mono text-sm border rounded-md px-4 py-2 select-all">
+              pip install sentry-safety
+            </code>
+          </div>
         </div>
       </section>
 

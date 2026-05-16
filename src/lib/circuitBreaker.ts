@@ -1,7 +1,7 @@
 /**
  * Per-name circuit breaker.
  *
- * Wrap any failure-prone async call (Groq, Supabase, third-party API) and
+ * Wrap any failure-prone async call (Denis Space, HF Inference, Supabase, third-party API) and
  * the breaker will fail-fast once a threshold of failures is hit in a sliding
  * window. After `openMs` it transitions to half-open and lets a single probe
  * through; success closes the circuit, failure re-opens it.

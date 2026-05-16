@@ -9,8 +9,8 @@ Read first: repo root `AGENTS.md`, `docs/API.md`.
 - Tests are **standalone scripts** (`npx tsx tests/<name>.ts`). No Vitest / Jest in MVP — too much config burden.
 - Every test points at `process.env.SENTRY_SAFETY_URL` (default: `http://localhost:3000`). Never hardcode hosts.
 - Tests must work in two modes (env-controlled):
-  - **Live:** `DEMO_MODE=false` on the server; Layer 2 calls OpenAI.
-  - **Mock:** `DEMO_MODE=true` on the server; Layer 2 uses the shim. Layer 1 unaffected.
+  - **Live:** `DEMO_MODE=false` on the server; Layer 2 calls Denis ML Gradio Space.
+  - **Mock:** `DEMO_MODE=true` on the server; Layer 2 uses `mockLayer2()` shim. Layer 1 unaffected.
 
 ## What lives here
 

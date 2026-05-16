@@ -8,6 +8,13 @@ import {
 import { PLACEHOLDER_TEXT, PRESETS } from './samples';
 import type { ScanRecord, ScanConfig } from './types';
 import { useScan } from './useScan';
+import { XRayView } from './xray';
+
+const SAMPLE_PDFS: { id: string; label: string; file: string }[] = [
+  { id: 'poisoned', label: 'Try: Poisoned vendor PDF', file: 'vendor-quote-poisoned.pdf' },
+  { id: 'resume',   label: 'Try: PII-heavy resume',     file: 'resume-pii.pdf' },
+  { id: 'combo',    label: 'Try: Combo attack',         file: 'combo-attack.pdf' },
+];
 
 interface ScanPageProps {
   config: ScanConfig;
@@ -23,6 +30,8 @@ export function ScanPage({ config, setConfig, addScan }: ScanPageProps) {
   const [scanStage, setScanStage] = useState(0);
   const [result, setResult] = useState<ScanRecord | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [xray, setXray] = useState<boolean>(false);
+  const [loadingSample, setLoadingSample] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { runScan: doScan } = useScan();
 
@@ -34,7 +43,7 @@ export function ScanPage({ config, setConfig, addScan }: ScanPageProps) {
       const next = has
         ? c.privacy.entities_to_mask.filter(x => x !== ent)
         : [...c.privacy.entities_to_mask, ent];
-      return { ...c, privacy: { ...c.privacy, entities_to_mask: next } };
+      return { ...c, privacy: { ...c.privacy, mask_pii: true, entities_to_mask: next } };
     });
   }
 
@@ -52,8 +61,8 @@ export function ScanPage({ config, setConfig, addScan }: ScanPageProps) {
     if (f) setFile(f);
   }
 
-  async function runScan() {
-    if (!text && !file) return;
+  async function runScanWith(opts: { text: string; file: File | null }) {
+    if (!opts.text && !opts.file) return;
     setScanning(true);
     setResult(null);
     setError(null);
@@ -71,9 +80,9 @@ export function ScanPage({ config, setConfig, addScan }: ScanPageProps) {
     })();
 
     try {
-      const kind = file ? 'file' : 'text';
+      const kind = opts.file ? 'file' : 'text';
       const [scanResult] = await Promise.all([
-        doScan(text, kind, config, file),
+        doScan(opts.text, kind, config, opts.file),
         stageAnimation,
       ]);
       setResult(scanResult);
@@ -83,6 +92,33 @@ export function ScanPage({ config, setConfig, addScan }: ScanPageProps) {
       setError(message);
     } finally {
       setScanning(false);
+    }
+  }
+
+  async function runScan() {
+    return runScanWith({ text, file });
+  }
+
+  async function loadSamplePdf(filename: string) {
+    setError(null);
+    setLoadingSample(filename);
+    try {
+      const res = await fetch(`/demo/${filename}`);
+      if (!res.ok) {
+        setError(`Sample not yet generated — see public/demo/ (${filename})`);
+        return;
+      }
+      const blob = await res.blob();
+      const pdfFile = new File([blob], filename, { type: 'application/pdf' });
+      setFile(pdfFile);
+      setText('');
+      // Auto-run the scan with this file so the demo flow is one-click.
+      await runScanWith({ text: '', file: pdfFile });
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Failed to load sample';
+      setError(`Sample not yet generated — see public/demo/ (${message})`);
+    } finally {
+      setLoadingSample(null);
     }
   }
 
@@ -102,7 +138,12 @@ export function ScanPage({ config, setConfig, addScan }: ScanPageProps) {
 
       <div className="layout-sidebar">
         <div className="sidebar-stack">
-          <SettingsPanel config={config} setConfig={setConfig} />
+          <SettingsPanel
+            config={config}
+            setConfig={setConfig}
+            xray={xray}
+            setXray={setXray}
+          />
           <EntitiesPanel
             entities={config.privacy.entities_to_mask}
             onToggle={toggleEntity}
@@ -119,14 +160,23 @@ export function ScanPage({ config, setConfig, addScan }: ScanPageProps) {
               </div>
             </div>
 
-            <textarea
-              className="textarea"
-              rows={7}
-              placeholder={'Paste text to scan…\n\nExample: ' + PLACEHOLDER_TEXT}
-              value={text}
-              onChange={e => setText(e.target.value)}
-              disabled={scanning}
-            />
+            {xray ? (
+              <div>
+                <div className="mono" style={{ fontSize: 10, color: 'var(--text3)', marginBottom: 6, letterSpacing: '0.08em' }}>
+                  X-RAY VIEW · hidden characters revealed
+                </div>
+                <XRayView text={text} />
+              </div>
+            ) : (
+              <textarea
+                className="textarea"
+                rows={7}
+                placeholder={'Paste text to scan…\n\nExample: ' + PLACEHOLDER_TEXT}
+                value={text}
+                onChange={e => setText(e.target.value)}
+                disabled={scanning}
+              />
+            )}
 
             <div className="preset-row">
               <span className="mono" style={{ fontSize: 10, color: 'var(--text3)', alignSelf: 'center', marginRight: 4 }}>SAMPLES</span>
@@ -134,6 +184,21 @@ export function ScanPage({ config, setConfig, addScan }: ScanPageProps) {
               <button className="preset-btn" onClick={() => setText(PRESETS.injection)}>Prompt injection</button>
               <button className="preset-btn" onClick={() => setText(PRESETS.mixed)}>Mixed attack</button>
               <button className="preset-btn" onClick={() => setText(PRESETS.clean)}>Clean text</button>
+            </div>
+
+            <div className="preset-row" style={{ marginTop: 8 }}>
+              <span className="mono" style={{ fontSize: 10, color: 'var(--text3)', alignSelf: 'center', marginRight: 4 }}>SAMPLE PDFs</span>
+              {SAMPLE_PDFS.map(s => (
+                <button
+                  key={s.id}
+                  className="preset-btn"
+                  onClick={() => loadSamplePdf(s.file)}
+                  disabled={scanning || loadingSample !== null}
+                  title={`/demo/${s.file}`}
+                >
+                  {loadingSample === s.file ? 'Loading…' : s.label}
+                </button>
+              ))}
             </div>
 
             <div style={{ marginTop: 14 }}>
@@ -226,7 +291,17 @@ export function ScanPage({ config, setConfig, addScan }: ScanPageProps) {
   );
 }
 
-function SettingsPanel({ config, setConfig }: { config: ScanConfig; setConfig: (fn: (c: ScanConfig) => ScanConfig) => void }) {
+function SettingsPanel({
+  config,
+  setConfig,
+  xray,
+  setXray,
+}: {
+  config: ScanConfig;
+  setConfig: (fn: (c: ScanConfig) => ScanConfig) => void;
+  xray: boolean;
+  setXray: (v: boolean) => void;
+}) {
   function set(path: string, val: boolean) {
     setConfig(c => {
       const next = JSON.parse(JSON.stringify(c)) as ScanConfig;
@@ -256,6 +331,13 @@ function SettingsPanel({ config, setConfig }: { config: ScanConfig; setConfig: (
         </div>
         <Toggle on={config.integrity.check_autophagy} onChange={v => set('integrity.check_autophagy', v)} />
       </div>
+      <div className="toggle-row">
+        <div className="toggle-info">
+          <div className="toggle-label">X-Ray view <span className="layer-tag">DEMO</span></div>
+          <div className="toggle-desc">Reveals invisible attacker text: zero-width chars, bidi-overrides, Cyrillic homoglyphs, hidden system prompts</div>
+        </div>
+        <Toggle on={xray} onChange={setXray} />
+      </div>
       <div className="divider-line"></div>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: 11.5, fontFamily: 'var(--mono)', color: 'var(--text3)' }}>
         <span style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
@@ -277,7 +359,7 @@ function EntitiesPanel({ entities, onToggle, disabled }: { entities: string[]; o
       </div>
       <div className="tag-row">
         {PII_ENTITIES.map(ent => (
-          <Pill key={ent} on={entities.includes(ent)} onClick={() => !disabled && onToggle(ent)}>
+          <Pill key={ent} on={entities.includes(ent)} onClick={() => onToggle(ent)}>
             {ent}
           </Pill>
         ))}

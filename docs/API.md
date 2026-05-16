@@ -129,7 +129,9 @@ Always `200 OK` with the verdict in body, unless the request itself is malformed
 | `metadata.pii_masked_count` | number | Total PII entities replaced. |
 | `metadata.synthetic_spam_removed` | boolean | True if Layer 3 ran and dropped any paragraph. |
 | `metadata.layer1` | object | Per-layer detail. Used by the dashboard's "Agent Trail". |
-| `metadata.layer2.demoMode` | boolean | True when Layer 2 came from the mock shim. UI should show a "MOCK" badge. |
+| `metadata.layer2.demoMode` | boolean | True when Layer 2 came from the mock shim — either because `DEMO_MODE=true` was set in env **or** because the Denis Space was unreachable and we fell back to `mockLayer2()`. UI should show a "MOCK" badge. |
+| `metadata.layer2.agents.semantic` | object | Denis classifier output: `{ verdict, score }` where `score` is `poison_probability`. |
+| `metadata.layer2.agents.logic` | object | Shape placeholder for dashboard backwards-compat. Always `{ verdict: "allow", score: 0 }`. |
 | `metadata.layer3.enabled` | boolean | True only when the request opted into integrity check. |
 | `latencyMs` | number | End-to-end. |
 
@@ -153,15 +155,16 @@ The canonical TypeScript shape lives in [`src/types/scan.ts`](../src/types/scan.
 | 415 | `unsupported_media_type` | Unknown MIME, or MIME-magic mismatch (e.g. `.pdf` extension on an `.exe`). |
 | 429 | `rate_limited` | Too many requests — token bucket (60 burst, 1 rps refill) per IP. |
 | 500 | `engine_error` | Unhandled exception in any layer. |
-| 502 | `model_unavailable` | Layer 2 OpenAI call failed and `DEMO_MODE` was not set. Caller may retry. |
+| 502 | `model_unavailable` | Layer 2 Denis ML call failed and `DEMO_MODE` was not set. Caller may retry. (With the new fallback shim, this code may never fire in practice — a Denis outage falls back to `mockLayer2()` instead of erroring.) |
 
 ## DEMO_MODE
 
 When the server has `DEMO_MODE=true` in env:
 
 - **Layer 1 still runs normally.** PII masking, zip-bomb checks, MIME validation, and injection signatures are unaffected.
-- **Layer 2 short-circuits** to a deterministic shim that pattern-matches a small list of injection markers on the Layer-1-sanitised text.
-- `metadata.layer2.demoMode: true` so the UI can label the response.
+- **Layer 2 short-circuits** to `mockLayer2()` — a deterministic shim that pattern-matches a small list of injection markers on the Layer-1-sanitised text. **Denis ML is not called.**
+- The same shim is used as a fallback when the Denis Space is unreachable, even if `DEMO_MODE=false`.
+- `metadata.layer2.demoMode: true` so the UI can label the response. This flag is `true` when either the `DEMO_MODE` env is set **or** the Denis fallback was triggered.
 - Latency is artificially padded to ~600 ms so the demo feels real.
 
 This is the failsafe for live presentation. Treat it as a first-class code path, not a hack.

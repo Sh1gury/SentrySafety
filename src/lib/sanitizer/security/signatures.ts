@@ -23,10 +23,12 @@ const INJECTION_SIGNATURES: RegExp[] = [
   /do\s+not\s+(follow|obey|apply|use)\s+(your|any|the)\s+(previous|prior|original|system)\s+(instructions?|prompt|rules?|guidelines?)/i,
   /\bprompt\s+injection\b/i,
   /\brole[\s-]play\b.*\b(as|like)\b.*(AI|assistant|system|bot)/i,
-  /forget\s+everything\s+(you\s+)?(know|were\s+told|learned)/i,
+  /forget\s+(everything\s+)?(you\s+)?(know|were\s+told|learned|have\s+been\s+told|were\s+taught)/i,
   /your\s+(true|real|hidden|actual)\s+(self|purpose|goal|identity|instructions?)/i,
   /\bsudo\s+(mode|override|access)\b/i,
   /\badmin\s+override\b/i,
+  /(dump|reveal|print|show|output|display|leak)\s+(all\s+)?(stored\s+)?(client\s+)?(API\s+keys?|credentials?|secrets?|passwords?|tokens?|system\s+prompt)/i,
+  /forget\s+(what|everything)\s+(you\s+)?(were|have\s+been)\s+(told|taught|instructed|given)/i,
 ];
 
 // Cyrillic -> Latin confusables fold (lowercase Latin targets).

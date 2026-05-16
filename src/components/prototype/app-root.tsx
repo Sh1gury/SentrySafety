@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { TopNav } from './shared';
 import { ScanPage } from './scan';
 import { LogsPage } from './logs';
@@ -13,8 +13,23 @@ import type { ScanRecord, Page } from './types';
 
 export default function AppRoot({ initialUser }: { initialUser: string }) {
   const [page, setPage] = useState<Page>('scan');
-  const { config, setConfig, displayName, setDisplayName, save, saving, savedAt } = useConfig();
+  const { config, setConfig, displayName, setDisplayName, save, saving, savedAt, loading } = useConfig();
   const [scans, setScans] = useState<ScanRecord[]>([]);
+
+  // Load scans from localStorage on mount
+  useEffect(() => {
+    try {
+      const stored = localStorage.getItem('sentry_session_scans');
+      if (stored) setScans(JSON.parse(stored));
+    } catch {}
+  }, []);
+
+  // Save scans to localStorage on change
+  useEffect(() => {
+    try {
+      localStorage.setItem('sentry_session_scans', JSON.stringify(scans));
+    } catch {}
+  }, [scans]);
 
   async function handleLogout() {
     await logout();
@@ -22,6 +37,12 @@ export default function AppRoot({ initialUser }: { initialUser: string }) {
 
   function addScan(s: ScanRecord) {
     setScans(prev => [s, ...prev]);
+  }
+
+  if (loading) {
+    return <div className="app-shell" style={{ alignItems: 'center', justifyContent: 'center' }}>
+      <div className="mono" style={{ color: 'var(--text3)' }}>Loading settings...</div>
+    </div>;
   }
 
   return (

@@ -2,25 +2,29 @@ import { logger } from '@/lib/logger';
 
 const SPACE_URL = (process.env.DENIS_SPACE_URL ?? 'https://zonda001-poison-defense.hf.space').replace(/\/$/, '');
 const API_KEY = (process.env.DENIS_API_KEY ?? '').trim();
-const TIMEOUT_MS = 12_000;
+const SUBMIT_TIMEOUT_MS = 60_000;   // Space may need 30-60s to wake from sleep
+const POLL_TIMEOUT_MS   = 30_000;
 
 export interface DenisScanResult {
   safe: boolean;
   trust_weight: number;
   poison_probability: number;
-  predicted_attack_type: string;
+  predicted_attack_type: string;       // "clean" | "prompt_injection"
+  attack_distribution?: Record<string, number>;
+  input_length?: number;
 }
 
 /**
  * Calls Denis's Gradio Space /scan_text endpoint.
- * Gradio 5.x REST pattern: POST /gradio_api/call/{fn} → event_id, then GET /gradio_api/call/{fn}/{id} → SSE.
- * Both image and text models live at the same Space URL; this targets only /scan_text.
+ * Denis uses a fine-tuned transformer (Zonda001/poison-defense-text) for text,
+ * and a CNN detector for images — both live at the same Space URL.
+ * Gradio 5.x REST: POST /gradio_api/call/{fn} → event_id, GET …/{id} → SSE.
  */
 export async function scanTextDenis(text: string): Promise<DenisScanResult> {
   const submitRes = await fetch(`${SPACE_URL}/gradio_api/call/scan_text`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    signal: AbortSignal.timeout(TIMEOUT_MS),
+    signal: AbortSignal.timeout(SUBMIT_TIMEOUT_MS),
     body: JSON.stringify({ data: [API_KEY, text.slice(0, 5000)] }),
   });
 
@@ -31,7 +35,7 @@ export async function scanTextDenis(text: string): Promise<DenisScanResult> {
   const { event_id } = await submitRes.json() as { event_id: string };
 
   const pollRes = await fetch(`${SPACE_URL}/gradio_api/call/scan_text/${event_id}`, {
-    signal: AbortSignal.timeout(TIMEOUT_MS),
+    signal: AbortSignal.timeout(POLL_TIMEOUT_MS),
   });
 
   if (!pollRes.ok) {

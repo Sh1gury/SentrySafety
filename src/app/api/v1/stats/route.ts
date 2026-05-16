@@ -84,7 +84,7 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
 
     const now = Date.now();
     const DAY_MS = 24 * 60 * 60 * 1000;
-    const all =
+    let all =
       range === "all"
         ? listAudit(undefined)
         : range === "24h"
@@ -92,6 +92,44 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
           : range === "7d"
             ? listAuditSince(now - 7 * DAY_MS)
             : listAuditSince(now - 30 * DAY_MS);
+
+    try {
+      const { createClient } = await import("@/lib/supabase/server");
+      const supabase = await createClient();
+      const { data: user } = await supabase.auth.getUser();
+      if (user?.user) {
+        let query = supabase
+          .from("audit_logs")
+          .select("*")
+          .eq("user_id", user.user.id)
+          .order("created_at", { ascending: false });
+
+        if (range === "24h") query = query.gte("created_at", new Date(now - DAY_MS).toISOString());
+        else if (range === "7d") query = query.gte("created_at", new Date(now - 7 * DAY_MS).toISOString());
+        else if (range === "30d") query = query.gte("created_at", new Date(now - 30 * DAY_MS).toISOString());
+
+        const { data, error } = await query;
+        if (!error && data) {
+          all = data.map((row) => ({
+            ts: row.created_at,
+            scanId: row.scan_id,
+            verdict: row.verdict,
+            layer1Verdict: row.layer1_verdict,
+            layer2Verdict: row.layer2_verdict,
+            layer3Enabled: row.layer3_enabled,
+            latencyMs: row.latency_ms,
+            layer1Ms: row.layer1_ms,
+            layer2Ms: row.layer2_ms,
+            inputLength: row.input_length,
+            kind: row.kind,
+            piiMaskedCount: row.pii_masked_count,
+            threatsBlocked: row.threats_blocked,
+          }));
+        }
+      }
+    } catch (e) {
+      logger.error({ err: e }, "Failed to fetch stats from DB");
+    }
 
     // Verdict counts
     const totals = { all: all.length, allow: 0, warn: 0, block: 0, error: 0 };

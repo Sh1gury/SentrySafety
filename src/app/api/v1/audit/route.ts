@@ -3,6 +3,7 @@ import { listAudit } from "@/lib/auditLog";
 import { checkRate } from "@/lib/rateLimit";
 import { logger } from "@/lib/logger";
 import { inc } from "@/lib/metrics";
+import { createClient } from "@/lib/supabase/server";
 
 // Local error type — scan.ts is a read-only team contract; do not edit it.
 type AuditErrorCode = "invalid_payload" | "rate_limited" | "engine_error";
@@ -95,6 +96,61 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
         : null;
 
     let filtered = listAudit(undefined);
+
+    try {
+      const supabase = await createClient();
+      const { data: user } = await supabase.auth.getUser();
+      if (user?.user) {
+        let query = supabase
+          .from("audit_logs")
+          .select("*", { count: "exact" })
+          .eq("user_id", user.user.id)
+          .order("created_at", { ascending: false });
+
+        if (!Number.isNaN(sinceMs)) {
+          query = query.gte("created_at", new Date(sinceMs).toISOString());
+        }
+        if (!Number.isNaN(untilMs)) {
+          query = query.lte("created_at", new Date(untilMs).toISOString());
+        }
+        if (verdictFilter) {
+          query = query.eq("verdict", verdictFilter);
+        }
+
+        query = query.range(offset, offset + limit - 1);
+
+        const { data, count, error } = await query;
+        if (!error && data) {
+          const dbEntries = data.map((row) => ({
+            ts: row.created_at,
+            scanId: row.scan_id,
+            verdict: row.verdict,
+            layer1Verdict: row.layer1_verdict,
+            layer2Verdict: row.layer2_verdict,
+            layer3Enabled: row.layer3_enabled,
+            latencyMs: row.latency_ms,
+            layer1Ms: row.layer1_ms,
+            layer2Ms: row.layer2_ms,
+            inputLength: row.input_length,
+            kind: row.kind,
+            piiMaskedCount: row.pii_masked_count,
+            threatsBlocked: row.threats_blocked,
+          }));
+          return NextResponse.json(
+            { entries: dbEntries, total: count || 0, limit, offset },
+            {
+              headers: {
+                ...corsHeaders(origin),
+                "x-rate-remaining": String(rate.remaining),
+              },
+            },
+          );
+        }
+      }
+    } catch (e) {
+      logger.error({ err: e }, "Failed to fetch audit logs from DB");
+    }
+
     if (!Number.isNaN(sinceMs)) {
       filtered = filtered.filter((e) => new Date(e.ts).getTime() >= sinceMs);
     }

@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { nanoid } from "nanoid";
 import { runLayer1 } from "@/lib/sanitizer";
-import { runLayer2, runLayer3 } from "@/lib/ai";
+import { runLayer3 } from "@/lib/ai";
+import { runLayer2Pipeline } from "@/lib/ai/layer2Pipeline";
 import { fuseAllLayers } from "@/lib/ai/fusion";
 import type {
   SanitizeRequest,
@@ -119,27 +120,9 @@ async function processOne(item: SanitizeRequest): Promise<SanitizeResponse> {
       } satisfies SanitizeError;
     }
 
-    // ── Layer 2 ─────────────────────────────────────────────────────────────
+    // ── Layer 2 — Denis ML (primary) + deterministic mock fallback ─────────
 
-    const demoMode = process.env.DEMO_MODE === "true";
-    let layer2;
-
-    try {
-      layer2 = await runLayer2(layer1.clean_text, { demoMode });
-    } catch {
-      if (!demoMode) {
-        return {
-          status: "error",
-          error: "model_unavailable",
-          message: "Layer 2 LLM unavailable. Set DEMO_MODE=true as fallback.",
-        } satisfies SanitizeError;
-      }
-      return {
-        status: "error",
-        error: "engine_error",
-        message: "Layer 2 failed even in demo mode.",
-      } satisfies SanitizeError;
-    }
+    const layer2 = await runLayer2Pipeline(layer1.clean_text, layer1.raw_text);
 
     // ── Layer 3 (opt-in) ────────────────────────────────────────────────────
 

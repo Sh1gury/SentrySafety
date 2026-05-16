@@ -42,8 +42,8 @@ function auditToRow(e: AuditEntry): ServerRow | null {
     id: e.scanId,
     ts: new Date(e.ts).getTime(),
     verdict: e.verdict,
-    kind: 'server',
-    pii: 0,
+    kind: e.kind || 'server',
+    pii: e.piiMaskedCount || 0,
     threats,
     threatList,
     latency: e.latencyMs ?? 0,
@@ -78,6 +78,42 @@ function rowSearchHaystack(r: Row): string {
     return [r.scan.id, r.scan.filename ?? '', r.scan.preview ?? ''].join(' ').toLowerCase();
   }
   return r.id.toLowerCase();
+}
+
+function synthesizeScanRecord(r: ServerRow): ScanRecord {
+  return {
+    id: r.id,
+    ts: r.ts,
+    kind: r.kind,
+    verdict: r.verdict,
+    pii: r.pii,
+    threats: r.threats,
+    threatList: r.threatList,
+    latency: r.latency,
+    bytes: r.bytes,
+    preview: '(Preview not stored in server logs)',
+    tokenMap: {},
+    layer1: {
+      verdict: (r.raw.layer1Verdict as import('@/types/scan').Verdict) || 'allow',
+      categories: {},
+      threat_scores: {},
+      latency_ms: r.raw.layer1Ms || 0,
+    },
+    layer2: {
+      verdict: (r.raw.layer2Verdict as import('@/types/scan').Verdict) || 'allow',
+      score: 0,
+      agents: {
+        semantic: { score: 0, flags: [] },
+        logic: { score: 0, flags: [] },
+      },
+      demoMode: false,
+    },
+    layer3: {
+      enabled: r.raw.layer3Enabled ?? false,
+      synthetic_paragraphs_removed: r.raw.layer3Enabled ? 1 : 0,
+      confidence: r.raw.layer3Enabled ? 0.9 : 0,
+    },
+  };
 }
 
 export function LogsPage({
@@ -243,13 +279,12 @@ export function LogsPage({
               return (
                 <tr
                   key={id}
-                  onClick={() => sessionScan && setSelected(sessionScan)}
+                  onClick={() => setSelected(isSession ? sessionScan! : synthesizeScanRecord(r as ServerRow))}
                   className={classNames(
                     selected?.id === id && 'selected',
                     verdict === 'block' && 'row-block',
                     verdict === 'warn' && 'row-warn',
                   )}
-                  style={!isSession ? { cursor: 'default' } : undefined}
                 >
                   <td className="mono" style={{ color: 'var(--text)' }}>
                     {id.replace(/_(\w{6}).*/, '_$1')}
@@ -270,9 +305,7 @@ export function LogsPage({
                   </td>
                   <td className="mono" style={{ textAlign: 'right' }}>{latency} ms</td>
                   <td>
-                    {sessionScan
-                      ? <button className="btn btn-sm" onClick={e => { e.stopPropagation(); setSelected(sessionScan); }}>Details</button>
-                      : <span className="cell-dim mono" style={{ fontSize: 10 }}>—</span>}
+                    <button className="btn btn-sm" onClick={e => { e.stopPropagation(); setSelected(isSession ? sessionScan! : synthesizeScanRecord(r as ServerRow)); }}>Details</button>
                   </td>
                 </tr>
               );

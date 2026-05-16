@@ -7,14 +7,14 @@ Four encapsulation zones inside `app/`. The whole point of zones is **merge-conf
 **Owns:**
 - `src/app/api/**` — all Next.js Route Handlers, primarily `POST /api/v1/sanitize`.
 - `src/lib/sanitizer/**` — Layer 1: PII regex, NER (`wink-nlp`), MIME, zip-bomb, macros, injection signatures, tokenisation.
-- `src/lib/ai/**` — Layer 2: OpenAI client, sandwich prompt builder, semantic + logic agents, fusion, `DEMO_MODE` shim. Optional Layer 3 (Groq).
+- `src/lib/ai/**` — Layer 2: Denis ML Gradio Space client (`denisClient.ts`), `layer2Pipeline.ts` (DEMO_MODE / Denis / `mockLayer2()` fallback chain), fusion. Layer 3: Hugging Face Inference API + heuristic fallback.
 - `next.config.ts`, `package.json` (top-level deps), `.env.example`.
 
 **Public contract:**
 - `POST /api/v1/sanitize` — see [API.md](API.md).
 - The exported types in `src/types/scan.ts` (changes require sign-off).
 
-**Allowed to import:** anything in `src/lib/sanitizer/**`, `src/lib/ai/**`, `src/types/**`, Node/Next stdlib, OpenAI SDK, `wink-nlp`.
+**Allowed to import:** anything in `src/lib/sanitizer/**`, `src/lib/ai/**`, `src/types/**`, Node/Next stdlib, `wink-nlp`. No LLM SDKs — Denis is reached via `fetch`, HF Inference API via `fetch`.
 **Forbidden to import:** anything from `src/components/**` or `src/app/dashboard/**`. The API has no idea the UI exists.
 
 ## Zone B — Dashboard UI (Frontend Engineer)

@@ -20,7 +20,7 @@ This file is loaded into every Claude Code session in this repository. It is the
 ### The three layers (read this twice)
 
 1. **Layer 1 — Deterministic.** Local, no LLM. Regex PII (IBAN, cards, phones), NER (PERSON/ORG/LOC) via `wink-nlp`, MIME magic-byte check, zip-bomb decompression-ratio guard, DOCX macro stripping, prompt-injection signature list. Always on, runs offline.
-2. **Layer 2 — Semantic.** `llama-3.3-70b-versatile` via Groq API, sandwich-prompted. Two LLM agents: `semantic` (subtle jailbreaks, role-escalation) and `logic` (data poisoning). Only sees text already PII-masked by Layer 1.
+2. **Layer 2 — Semantic.** **Denis ML** — our own fine-tuned transformer classifier (`Zonda001/poison-defense-text`) served from a Gradio Space at `https://zonda001-poison-defense.hf.space`. Binary output: `predicted_attack_type ∈ { "clean", "prompt_injection" }` plus a `poison_probability` score used for warn/block escalation. The response DTO still exposes `agents: { semantic, logic }` for dashboard backwards-compat; `semantic` carries Denis's output, `logic` is a fixed `{ allow, 0 }` shape placeholder. When `DEMO_MODE=true` or Denis is unreachable, `mockLayer2()` short-circuits this layer.
 3. **Layer 3 — Integrity (opt-in).** Detects AI-generated slop to prevent vector-store autophagy. Off by default; enabled per request via `config.integrity.check_autophagy`.
 
 Full detail: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
@@ -59,12 +59,12 @@ Full ownership table and contract rules: [docs/ZONES.md](docs/ZONES.md).
 
 1. **Stay in your zone.** If a task requires touching another zone, stop and ask. Cross-zone edits are how 26-hour hackathons die.
 2. **Never edit `src/types/scan.ts` without flagging it.** That file is the contract between all four zones. Treat it like a public API.
-3. **Read [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) before designing anything.** It explains the three layers, sandwich prompting, and `DEMO_MODE` — concepts your training data does not cover.
+3. **Read [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) before designing anything.** It explains the three layers, Denis ML, and `DEMO_MODE` — concepts your training data does not cover.
 4. **No new top-level dependencies without discussion.** `npm install` shifts the lockfile. Justify each new package in chat first.
-5. **Layer 1 runs first, always.** Even when `DEMO_MODE=true`. Layer 1 is what protects user PII from ever reaching OpenAI — that property is non-negotiable.
+5. **Layer 1 runs first, always.** Even when `DEMO_MODE=true`. Layer 1 is what protects user PII from ever reaching the LLM — that property is non-negotiable.
 6. **Supabase is post-MVP.** Auth screens (`/login`, `/register`), `src/lib/supabase/*`, and the auth middleware are scaffolded but should not gate the demo. Route around them; do not remove them.
 7. **Optimise for the demo path.** Every change should be reachable from the live demo script in [docs/DEMO.md](docs/DEMO.md). If a feature cannot be shown on stage, deprioritise it.
-8. **Honour `DEMO_MODE`.** When `DEMO_MODE=true`, Layer 2 short-circuits to a deterministic mock without calling OpenAI. Layer 1 keeps running normally. Venue Wi-Fi failure is the assumed failure mode.
+8. **Honour `DEMO_MODE`.** When `DEMO_MODE=true`, Layer 2 short-circuits to `mockLayer2()` without calling Denis. Layer 1 keeps running normally. Venue Wi-Fi failure is the assumed failure mode.
 9. **English only in code, docs, and commit messages.** Team-internal chat in Ukrainian is fine; artefacts that ship are English.
 10. **No emojis in code, docs, or UI copy** unless a teammate asks for them. The product should look like enterprise security software.
 11. **Pre-RAG, not post-RAG.** We refuse documents before they touch a vector store. If you find yourself scanning embeddings, you are in the wrong product.
@@ -92,6 +92,6 @@ Full ownership table and contract rules: [docs/ZONES.md](docs/ZONES.md).
 
 - Do **not** rotate, exfiltrate, or log secrets from `.env.local`. Required keys live in `.env.example`.
 - Do **not** commit `.env*` files (already in `.gitignore`; do not weaken).
-- Do **not** ship a feature without a fallback for `DEMO_MODE=true`. If OpenAI dies on stage, the demo must still work via Layer 1 + mocked Layer 2.
+- Do **not** ship a feature without a fallback for `DEMO_MODE=true`. If Denis Space dies on stage, the demo must still work via Layer 1 + `mockLayer2()`.
 - Do **not** log raw document content. `scanId` + length + verdict only. Documents may be adversarial — see [docs/SECURITY.md](docs/SECURITY.md).
-- Do **not** send unmasked PII to Groq. Layer 1 must run before Layer 2; this ordering is the product's main selling point.
+- Do **not** send unmasked PII to Denis. Layer 1 must run before Layer 2; this ordering is the product's main selling point.

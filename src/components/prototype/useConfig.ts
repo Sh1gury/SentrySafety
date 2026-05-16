@@ -15,7 +15,7 @@ const DEFAULT_CONFIG: ScanConfig = {
     strip_macros: true,
   },
   integrity: {
-    check_autophagy: false,
+    check_autophagy: true,
   },
 };
 
@@ -61,6 +61,7 @@ export interface UseConfigResult {
   saving: boolean;
   savedAt: number | null;
   error: string | null;
+  loading: boolean;
 }
 
 export function useConfig(): UseConfigResult {
@@ -69,7 +70,9 @@ export function useConfig(): UseConfigResult {
   const [saving, setSaving] = useState(false);
   const [savedAt, setSavedAt] = useState<number | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
   const savedTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const initialLoadDone = useRef(false);
 
   // Keep latest values for save() without forcing a stable callback identity.
   const latest = useRef({ config, displayName });
@@ -83,14 +86,27 @@ export function useConfig(): UseConfigResult {
       try {
         const res = await fetch('/api/v1/config');
         if (cancelled) return;
-        if (res.status === 401) return; // demo / unauthenticated — keep defaults
-        if (!res.ok) return;
+        if (res.status === 401) {
+          initialLoadDone.current = true;
+          setLoading(false);
+          return;
+        }
+        if (!res.ok) {
+          initialLoadDone.current = true;
+          setLoading(false);
+          return;
+        }
         const body = (await res.json()) as ConfigResponse;
         if (cancelled) return;
         setConfig(fromSanitize(body.config));
         setDisplayName(body.displayName);
       } catch {
         // network failure → keep in-memory defaults
+      } finally {
+        if (!cancelled) {
+          initialLoadDone.current = true;
+          setLoading(false);
+        }
       }
     })();
     return () => {
@@ -133,5 +149,13 @@ export function useConfig(): UseConfigResult {
     }
   }, []);
 
-  return { config, setConfig, displayName, setDisplayName, save, saving, savedAt, error };
+  useEffect(() => {
+    if (!initialLoadDone.current) return;
+    const t = setTimeout(() => {
+      save();
+    }, 500);
+    return () => clearTimeout(t);
+  }, [config, save]);
+
+  return { config, setConfig, displayName, setDisplayName, save, saving, savedAt, error, loading };
 }

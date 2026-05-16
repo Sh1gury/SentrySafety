@@ -45,7 +45,7 @@ src/lib/sdk/
 
 You also own the user-facing surface outside the dashboard:
 
-- `src/app/page.tsx` — landing page. Hero, "three-layer" diagram, install snippet, "PII never reaches OpenAI" headline.
+- `src/app/page.tsx` — landing page. Hero, "three-layer" diagram, install snippet, "PII never reaches the LLM" headline.
 - `src/app/docs/page.tsx` (and sub-pages) — quickstart, full API reference, SDK reference, threat catalogue, three-layer explanation.
 
 Both must look good on mobile (jury may pull it up on phones). Use shadcn `Card`, `Tabs`, code-block patterns.

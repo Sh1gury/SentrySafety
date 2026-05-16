@@ -119,11 +119,13 @@ export function DashboardPage({ scans }: { scans: ScanRecord[] }) {
   const warnPct = verdictTotal > 0 ? (stats.warnAll / verdictTotal * 100).toFixed(1) : '0.0';
   const blockPct = verdictTotal > 0 ? (stats.blockAll / verdictTotal * 100).toFixed(1) : '0.0';
 
+  const rangeEyebrow = `ANALYTICS · ${range === '24h' ? 'LAST 24 HOURS' : range === '7d' ? 'LAST 7 DAYS' : range === 'all' ? 'ALL TIME' : 'LAST 30 DAYS'}`;
+
   if (scans.length === 0 && (!serverStats || serverStats.totals.all === 0)) {
     return (
       <div className="page">
         <PageHeader
-          eyebrow="ANALYTICS · LAST 30 DAYS"
+          eyebrow={rangeEyebrow}
           title="Statistics & analytics"
           subtitle="Overview of all scanned files and requests across your organization"
         />
@@ -135,10 +137,12 @@ export function DashboardPage({ scans }: { scans: ScanRecord[] }) {
     );
   }
 
+  const rangeSub = range === '24h' ? '24 hours' : range === '7d' ? '7 days' : range === 'all' ? 'All time' : '30 days';
+
   return (
     <div className="page">
       <PageHeader
-        eyebrow="ANALYTICS · LAST 30 DAYS"
+        eyebrow={rangeEyebrow}
         title="Statistics & analytics"
         subtitle="Overview of all scanned files and requests across your organization"
         right={
@@ -189,7 +193,7 @@ export function DashboardPage({ scans }: { scans: ScanRecord[] }) {
         <div className="card">
           <div className="card-title-row">
             <div className="card-title">Verdict breakdown</div>
-            <span className="mono" style={{ fontSize: 11, color: 'var(--text3)' }}>30 days</span>
+            <span className="mono" style={{ fontSize: 11, color: 'var(--text3)' }}>{rangeSub}</span>
           </div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 16, marginTop: 6 }}>
             <BarRow label="Allow" value={stats.allowAll} pct={allowPct} kind="allow" />

@@ -8,7 +8,7 @@ When the user identifies as Bogdana, treat this file as authoritative for model 
 - `src/app/page.tsx` — landing page.
 - `src/app/docs/**` — quickstart, API reference, SDK reference, threat catalogue.
 
-Your work is what **integrators** see first and what the **jury sees second** (after the dashboard). The pitch headline — "PII never reaches OpenAI" — is your landing copy.
+Your work is what **integrators** see first and what the **jury sees second** (after the dashboard). The pitch headline — "PII never reaches the LLM" — is your landing copy.
 
 ## Model choice for this session
 
@@ -46,7 +46,7 @@ Type "check Context7 for X" or trigger `context7` directly. Fresh docs you will 
 2. **Browser + Node runtime targets.** Use global `fetch`. No Node-only imports (`fs`, `path`, etc.).
 3. **Imports allowed: `@/types/scan` only.** The SDK speaks HTTP; it never imports server code, Supabase, AI, or sanitizer.
 4. **Error model:** throw `SentrySafetyError` subclasses carrying `code: SanitizeErrorCode`. Match the API exactly.
-5. **Landing message: "PII never reaches the LLM."** That is the headline (Groq only sees tokenised text). The three-layer diagram makes it credible.
+5. **Landing message: "PII never reaches the LLM."** That is the headline — Denis (our classifier) only sees text Layer 1 has already tokenised. The three-layer diagram makes it credible.
 6. **Docs page must work on mobile.** Jury may pull it up on phones during Q&A.
 
 ## Do not touch

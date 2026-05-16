@@ -1,73 +1,79 @@
 # Zone A — AI Core / Layer 2 + 3 (Anton)
 
-You are inside `src/lib/ai/**`. This is **Layer 2** (LLM ensemble) and, optionally, **Layer 3** (autophagy check). Both use the same Groq API key.
+You are inside `src/lib/ai/**`. This is **Layer 2** (Denis ML classifier) and, optionally, **Layer 3** (autophagy check).
 
 Read first: repo root `AGENTS.md`, `docs/ARCHITECTURE.md`, `docs/SECURITY.md`.
 
-## Important: Layer 2 only sees Layer-1-sanitised text
+## Important: Layer 2 sees the raw text; the masked text feeds the rest of the chain
 
-By the time this module runs, PII has been replaced by tokens (`[PERSON_1]`, `[IBAN_1]`, etc.). That is the product's main selling point — the LLM provider never receives raw PII. **Do not undo this**: do not import the original text or the `tokenMap` into any prompts.
+By the time this module runs, Layer 1 has produced both `raw_text` and `clean_text`. Denis's transformer is sent the **raw** text — PII tokens like `[PERSON_1]` confuse the classifier and inflate scores. Everything downstream of Layer 2 (Layer 3, the response payload, the dashboard) only ever sees `clean_text`. Do not leak raw text past Layer 2.
 
-## Layer 2 — Groq + Llama
+## Layer 2 — Denis ML (Gradio Space)
 
-- Provider: **Groq API** (`GROQ_API_KEY`).
-- Default model: **`llama-3.3-70b-versatile`** — fast (~200-400 ms), strong reasoning, supports JSON mode.
-- JSON mode: `response_format: { type: "json_object" }`. Groq does not support OpenAI-style strict `json_schema`; **validate the parsed object against our schema on our side** (lightweight type-guard in `src/lib/ai/validateLayer2.ts`).
-- Force-prompt JSON structure: the sandwich header must also explicitly say "respond with valid JSON matching this schema: { ... }" to improve reliability.
+- Provider: **Denis's Hugging Face Space** (`https://zonda001-poison-defense.hf.space`), our fine-tuned `Zonda001/poison-defense-text` transformer behind Gradio 5.x REST.
+- Client: `src/lib/ai/denisClient.ts` → `scanTextDenis(text)`.
+- Output: `{ predicted_attack_type: "clean" | "prompt_injection", poison_probability, trust_weight, ... }`.
+- Score-to-verdict thresholds (only escalate on extreme scores — the transformer floors at ~0.9):
+  - `type === "clean"` → always `allow`
+  - `type === "prompt_injection"` and `score >= 0.99` → `block`
+  - `type === "prompt_injection"` and `score >= 0.96` → `warn`
+  - otherwise → `allow`
+- The response DTO still carries `agents: { semantic, logic }` for dashboard backwards-compat. `semantic` holds Denis's verdict/score; `logic` is a fixed `{ allow, 0 }` placeholder.
 
-All Groq calls go through `groqClient.ts`. No raw `fetch("https://api.groq.com/...")` anywhere else in the codebase.
+### Fail-closed via mock
 
-## Local rules
+If Denis throws (timeout, 5xx, malformed SSE), or `DEMO_MODE === "true"`, the pipeline falls back to `mockLayer2(cleanText)` from `demoMode.ts`. **Never silently return a default `allow`** — that lets an attacker DoS the Space to bypass Layer 2. The mock pattern-matches injection markers and returns a real verdict.
 
-- Every prompt builder lives in `prompts/` and **must** wrap user content in `<document>...</document>`. See `docs/ARCHITECTURE.md` → Sandwich prompting.
-- If the response fails JSON parsing or schema validation: retry once; if it fails again, return `engine_error`. Do not swallow invalid responses.
-- DEMO_MODE shim (`demoMode.ts`) exports `mockLayer2(cleanText): Layer2Report`. It must:
-  - Pattern-match a small list of injection markers (e.g. "ignore previous", "you are now", "developer mode").
-  - Vary the verdict with input so demos do not look static.
-  - Set `demoMode: true` on the report.
-  - Pad latency to ~400 ms so the demo feels real.
+All of this lives behind a single helper:
+
+```ts
+export async function runLayer2Pipeline(
+  cleanText: string,
+  rawText: string,
+): Promise<Layer2Report>;
+```
+
+Both `/api/v1/sanitize` and `/api/v1/sanitize/batch` call it. Cache logic stays in the routes — the helper just produces the verdict.
+
+### DEMO_MODE shim (`demoMode.ts`) must:
+
+- Pattern-match a small list of injection markers (e.g. "ignore previous", "you are now", "developer mode").
+- Vary the verdict with input so demos do not look static.
+- Set `demoMode: true` on the report.
+- Pad latency to ~400 ms so the demo feels real.
 
 ## Layer 3 (opt-in)
 
 Lives in `src/lib/ai/integrity/`. Runs only when the request opted in via `config.integrity.check_autophagy === true`.
 
-- Same Groq API key, lighter model (`llama-3.1-8b-instant` is fine for entropy scoring).
-- Input: Layer-1-sanitised text, paragraph-by-paragraph.
+- First choice: Hugging Face Inference API (`roberta-base-openai-detector`) — no key required.
+- Fallback: local heuristic over AI-filler phrases + bullet density.
 - Output: `Layer3Report` with `synthetic_paragraphs_removed` and `confidence`.
-- If `GROQ_API_KEY` is missing and Layer 3 was requested → return `Layer3Report { enabled: true, synthetic_paragraphs_removed: 0, confidence: 0 }` and log a warning. **Do not throw** — Layer 3 failure must not fail the whole sanitize call.
+- Layer 3 failure must **never** fail the whole sanitize call.
 
 ## Public surface
 
 Export from `src/lib/ai/index.ts`:
 
 ```ts
-export async function runLayer2(
-  cleanText: string,
-  opts: { demoMode: boolean }
-): Promise<Layer2Report>;
-
 export async function runLayer3(
   cleanText: string,
   opts: { enabled: boolean }
 ): Promise<Layer3Report>;
 ```
 
-## Suggested layout
+`runLayer2Pipeline` is exported from `src/lib/ai/layer2Pipeline.ts` directly (it is the only Layer 2 entry point — the old `runLayer2` Groq path has been removed).
+
+## Layout
 
 ```
 src/lib/ai/
-  index.ts              // public entry: runLayer2, runLayer3
-  groqClient.ts         // single Groq client, env-driven
-  validateLayer2.ts     // schema type-guard for Groq JSON responses
-  fusion.ts             // combine 2-agent verdicts into one Layer2Report
-  demoMode.ts           // mock Layer 2 shim
-  agents/
-    semantic.ts
-    logic.ts
-  prompts/
-    sandwich.ts         // shared header/footer builder
-    semantic.ts
-    logic.ts
+  index.ts              // public entry: runLayer3
+  layer2Pipeline.ts     // Denis → mockLayer2 fallback pipeline
+  denisClient.ts        // Gradio Space REST client
+  demoMode.ts           // mockLayer2 shim
+  fusion.ts             // verdict fusion helpers
+  chunking.ts           // text chunking utilities (kept for tests)
   integrity/
     runLayer3.ts
 ```
@@ -76,3 +82,4 @@ src/lib/ai/
 
 - Any React, any Next.js client-only API, any Supabase.
 - `src/lib/sanitizer/**` — Layer 2 is downstream. The route composes them, not us.
+- `groq-sdk` — removed from dependencies along with the abandoned Groq path.

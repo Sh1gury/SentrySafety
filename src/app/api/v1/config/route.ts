@@ -25,7 +25,7 @@ const DEFAULT_CONFIG: SanitizeConfig = {
     strip_macros: true,
   },
   integrity: {
-    check_autophagy: false,
+    check_autophagy: true,
   },
 };
 

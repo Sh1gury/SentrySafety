@@ -18,6 +18,8 @@ export interface AuditEntry {
   layer1Ms?: number;
   layer2Ms?: number;
   inputLength: number;
+  kind?: string;
+  piiMaskedCount?: number;
   threatsBlocked?: Record<string, number>;
 }
 

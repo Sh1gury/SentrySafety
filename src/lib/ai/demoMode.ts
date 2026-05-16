@@ -1,5 +1,10 @@
 import type { Layer2Report, Verdict } from "@/types/scan";
-import { scoreToVerdict } from "./validateLayer2";
+
+function scoreToVerdict(score: number): Verdict {
+  if (score >= 0.7) return "block";
+  if (score >= 0.4) return "warn";
+  return "allow";
+}
 
 const MARKERS = [
   /ignore\s+(all\s+)?previous/i,

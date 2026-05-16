@@ -11,6 +11,8 @@ import { extractHtmlText } from "./extract/html";
 
 export interface Layer1Result {
   clean_text: string;
+  /** Extracted text before PII masking — used by Layer 2 (Denis ML). */
+  raw_text: string;
   tokenMap: Record<string, string>;
   report: Layer1Report;
   pii_masked_count: number;
@@ -94,7 +96,25 @@ export async function runLayer1(req: SanitizeRequest): Promise<Layer1Result> {
         threats.macros_stripped = stripped;
       }
 
-      rawText = await extractDocxText(workBuf);
+      // Try as DOCX first; if not a valid DOCX, extract text entries
+      try {
+        rawText = await extractDocxText(workBuf);
+      } catch {
+        // Not a DOCX — extract text from plain-text entries in the ZIP
+        // eslint-disable-next-line @typescript-eslint/no-require-imports
+        const AdmZip = require("adm-zip");
+        const zip = new AdmZip(workBuf);
+        const textParts: string[] = [];
+        const textExts = new Set(["txt", "csv", "md", "json", "xml", "html", "htm", "log"]);
+        for (const entry of zip.getEntries()) {
+          if (entry.isDirectory) continue;
+          const ext = entry.entryName.split(".").pop()?.toLowerCase() ?? "";
+          if (textExts.has(ext)) {
+            textParts.push(entry.getData().toString("utf-8"));
+          }
+        }
+        rawText = textParts.join("\n\n");
+      }
     } else if (detectedMime === "application/pdf") {
       const { text, security } = await extractPdfText(buf);
       if (security.hasJavaScript) {
@@ -176,6 +196,7 @@ export async function runLayer1(req: SanitizeRequest): Promise<Layer1Result> {
 
   return {
     clean_text: workText,
+    raw_text: rawText,
     tokenMap,
     report: { verdict, removed_paragraphs: removedParagraphs },
     pii_masked_count: piiCount,
@@ -192,6 +213,7 @@ function makeHardBlock(
 ): Layer1Result {
   return {
     clean_text: "",
+    raw_text: "",
     tokenMap: {},
     report: { verdict: "block", removed_paragraphs: 0 },
     pii_masked_count: 0,

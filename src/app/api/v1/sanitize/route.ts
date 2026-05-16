@@ -2,15 +2,15 @@ import { NextRequest, NextResponse } from "next/server";
 import { nanoid } from "nanoid";
 import { createHash } from "crypto";
 import { runLayer1 } from "@/lib/sanitizer";
-import { runLayer2, runLayer3 } from "@/lib/ai";
-import { scanTextDenis } from "@/lib/ai/denisClient";
+import { runLayer3 } from "@/lib/ai";
+import { runLayer2Pipeline } from "@/lib/ai/layer2Pipeline";
 import { fuseAllLayers } from "@/lib/ai/fusion";
 import { logger } from "@/lib/logger";
 import { cacheGet, cacheSet } from "@/lib/cache";
 import { checkRate } from "@/lib/rateLimit";
-import { withCircuit } from "@/lib/circuitBreaker";
 import { recordAudit } from "@/lib/auditLog";
 import { inc, observe } from "@/lib/metrics";
+import { createClient } from "@/lib/supabase/server";
 import type {
   SanitizeRequest,
   SanitizeResponse,
@@ -22,8 +22,7 @@ import type {
 const CORS_DEV_ORIGIN = "http://localhost:4000";
 const MAX_BODY_BYTES = 5 * 1024 * 1024; // 5 MB pre-extraction guard
 const IDEMPOTENCY_TTL_MS = 5 * 60_000;
-const LAYER2_CACHE_TTL_MS = 5 * 60_000;
-const CIRCUIT_NAME = "groq-layer2";
+const LAYER2_CACHE_TTL_MS = 0; // disabled — every scan hits Denis
 
 function corsHeaders(origin: string | null): HeadersInit {
   if (process.env.NODE_ENV !== "development") return {};
@@ -181,7 +180,7 @@ export async function POST(request: NextRequest): Promise<NextResponse<SanitizeR
       return fail(status, layer1.hard_block.error, layer1.hard_block.message);
     }
 
-    // ── Layer 2 — Denis ML (primary) + Groq (fallback) ─────────────────────
+    // ── Layer 2 — Denis ML (primary) + deterministic mock fallback ─────────
 
     const demoMode = process.env.DEMO_MODE === "true";
     const t2 = Date.now();
@@ -194,47 +193,16 @@ export async function POST(request: NextRequest): Promise<NextResponse<SanitizeR
       inc("sentry_layer2_cache_hits_total");
       layer2 = l2Cached;
     } else {
-      let denisSucceeded = false;
-      try {
-        const mlResult = await scanTextDenis(layer1.clean_text);
-        const score = parseFloat(
-          (mlResult.poison_probability ?? (1 - (mlResult.trust_weight ?? 0.5))).toFixed(3),
-        );
-        layer2 = {
-          verdict: mlResult.safe ? "allow" : "block",
-          score,
-          demoMode: false,
-          agents: {
-            semantic: { verdict: "allow", score: 0 },
-            logic: { verdict: mlResult.safe ? "allow" : "block", score },
-          },
-        };
-        denisSucceeded = true;
-        cacheSet(l2CacheKey, layer2, LAYER2_CACHE_TTL_MS);
-        logger.info(
-          { scanId, verdict: layer2.verdict, score, attack: mlResult.predicted_attack_type },
-          "layer2: Denis ML",
-        );
-      } catch (err) {
-        logger.warn(
-          { scanId, err: err instanceof Error ? err.message : String(err) },
-          "Denis ML unavailable, falling back to Groq",
-        );
-      }
-
-      if (!denisSucceeded) {
-        inc("sentry_layer2_failures_total", { reason: "denis_unavailable" });
-        layer2 = {
-          verdict: "allow",
-          score: 0,
-          demoMode: true,
-          agents: {
-            semantic: { verdict: "allow", score: 0 },
-            logic: { verdict: "allow", score: 0 },
-          },
-        };
-        logger.warn({ scanId }, "Denis ML unavailable; Layer 2 skipped (fail-open)");
-      }
+      // runLayer2Pipeline handles: DEMO_MODE → mock, else Denis with
+      // mockLayer2 fallback on error.  This closes the fail-open hole
+      // where a Denis outage previously let traffic through with a
+      // default "allow" verdict.
+      layer2 = await runLayer2Pipeline(layer1.clean_text, layer1.raw_text);
+      cacheSet(l2CacheKey, layer2, LAYER2_CACHE_TTL_MS);
+      logger.info(
+        { scanId, verdict: layer2.verdict, score: layer2.score, demoMode: layer2.demoMode },
+        "layer2: pipeline complete",
+      );
     }
     l2ms = Date.now() - t2;
 
@@ -270,6 +238,8 @@ export async function POST(request: NextRequest): Promise<NextResponse<SanitizeR
 
     // ── Audit + metrics + idempotency cache ─────────────────────────────────
 
+    const scanKind = body.filename ? (body.filename.split('.').pop()?.toLowerCase() || 'file') : 'text';
+
     recordAudit({
       ts: new Date().toISOString(),
       scanId,
@@ -281,8 +251,34 @@ export async function POST(request: NextRequest): Promise<NextResponse<SanitizeR
       layer1Ms: l1ms,
       layer2Ms: l2ms,
       inputLength,
+      kind: scanKind,
+      piiMaskedCount: layer1.pii_masked_count,
       threatsBlocked: { ...layer1.threats_blocked },
     });
+
+    try {
+      const supabase = await createClient();
+      const { data: user } = await supabase.auth.getUser();
+      if (user.user) {
+        await supabase.from("audit_logs").insert({
+          user_id: user.user.id,
+          scan_id: scanId,
+          verdict: finalVerdict,
+          layer1_verdict: layer1.report.verdict,
+          layer2_verdict: layer2.verdict,
+          layer3_enabled: layer3.enabled,
+          latency_ms: latencyMs,
+          layer1_ms: l1ms,
+          layer2_ms: l2ms,
+          input_length: inputLength,
+          kind: scanKind,
+          pii_masked_count: layer1.pii_masked_count,
+          threats_blocked: { ...layer1.threats_blocked },
+        });
+      }
+    } catch (e) {
+      logger.error({ err: e }, "Failed to write audit log to database");
+    }
 
     inc("sentry_scans_total", { verdict: finalVerdict });
     observe("sentry_scan_latency_ms", latencyMs);
@@ -321,6 +317,8 @@ export async function POST(request: NextRequest): Promise<NextResponse<SanitizeR
     });
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
+    const stack = err instanceof Error ? err.stack : "";
+    console.error("[SCAN ERROR]", msg, stack);
     logger.error({ scanId, err: msg }, "sanitize: unhandled error");
     return fail(500, "engine_error", "Internal engine error.");
   }

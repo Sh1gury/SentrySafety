@@ -6,7 +6,7 @@
  * Set SENTRY_SAFETY_URL to override the default http://localhost:3000.
  */
 
-import { SentrySafety, SentrySafetyError } from "../packages/sentry-safety-sdk/dist/index.mjs";
+import { SentrySafety, SentrySafetyError } from "../src/lib/sdk";
 
 const BASE_URL = process.env.SENTRY_SAFETY_URL ?? "http://localhost:3000";
 

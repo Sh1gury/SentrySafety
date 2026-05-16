@@ -6,7 +6,7 @@ When the user identifies as Anton, treat this file as authoritative for model se
 
 - `src/app/api/**` — Next.js Route Handlers. Primary: `POST /api/v1/sanitize`, `GET /api/health`.
 - `src/lib/sanitizer/**` — **Layer 1** (deterministic): PII regex, NER, MIME, zip-bomb, macros, signatures.
-- `src/lib/ai/**` — **Layer 2 + 3** (LLM): Groq client, sandwich prompts, fusion, DEMO_MODE shim, autophagy.
+- `src/lib/ai/**` — **Layer 2 + 3**: Denis ML Gradio Space client (`denisClient.ts`), `layer2Pipeline.ts` (Denis + `mockLayer2()` fallback), fusion, autophagy via HF Inference API. No Groq, no OpenAI.
 - `next.config.ts`, `package.json` (deps), `.env.example`.
 
 Public contract: `POST /api/v1/sanitize` + `src/types/scan.ts`. Everyone else depends on these.
@@ -36,20 +36,20 @@ Public contract: `POST /api/v1/sanitize` + `src/types/scan.ts`. Everyone else de
 
 The Context7 MCP server is configured. Type "check Context7 for X" or trigger `context7` directly. Fresh docs you will need:
 
-- `groq-sdk` — client setup, `chat.completions.create`, `response_format: { type: "json_object" }`, error classes.
 - `wink-nlp` + `wink-eng-lite-web-model` — NER tagging API, entity types, loading.
 - `pdfjs-dist` or `pdf-parse` — text-layer extraction.
+- Gradio v5 client protocol — Denis Space uses POST `/gradio_api/call/<endpoint>` + SSE polling; see `src/lib/ai/denisClient.ts`.
 
-Do not let training-data instincts override Context7 output. The Groq SDK evolves fast.
+Do not let training-data instincts override Context7 output.
 
 ## Hot rules you will forget under pressure
 
-1. **Layer 1 runs before Layer 2. Always.** Even when `DEMO_MODE=true`. PII never reaches Groq — that is the pitch.
+1. **Layer 1 runs before Layer 2. Always.** Even when `DEMO_MODE=true`. PII never leaves this process unmasked — that is the pitch.
 2. **Never log raw `request.body`** or document content at INFO level. Log `scanId` + length + verdict only.
-3. **Force JSON output** via `response_format: { type: "json_schema", ... }`. Free-form text reply → `engine_error`.
-4. **Sandwich tags around user input.** Header + `<document>...</document>` + footer, in that order. See `docs/ARCHITECTURE.md`.
+3. **Denis is a classifier, not a generator.** No prompt to build, no JSON-mode enforcement. Just POST text, parse `predicted_attack_type` + `poison_probability`.
+4. **`mockLayer2()` is the only Layer 2 fallback.** No Groq, no OpenAI — they are not in the stack. Triggered when `DEMO_MODE=true` or Denis fails.
 5. **DEMO_MODE shim is a first-class code path**, not a hack. It must produce schema-valid responses with `metadata.layer2.demoMode: true`.
-6. **Layer 3 failure must not fail the whole sanitize call.** If Groq dies, return `Layer3Report { enabled: true, ..., confidence: 0 }` and log a warning.
+6. **Layer 3 failure must not fail the whole sanitize call.** If HF Inference dies, fall back to the local heuristic and keep going.
 
 ## Do not touch
 

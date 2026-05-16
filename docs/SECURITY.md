@@ -33,12 +33,10 @@ Adversarial documents flowing into a corporate RAG knowledge base, where the doc
 
 Layer 2 is an LLM, so it is the most obvious target. See [ARCHITECTURE.md](ARCHITECTURE.md). Concretely:
 
-1. **Layer 1 runs first.** By the time Layer 2 sees the text, PII is already tokenised. Groq cannot leak what it never received.
-2. All user-controlled bytes are wrapped in `<document>...</document>`. The system prompt names this tag as untrusted data.
-3. A footer system message re-states the rule after the payload, owning the most-recent instruction position.
-4. The model is forced to JSON output via `response_format: { type: "json_schema", ... }`. Free-form text replies are rejected as `engine_error`.
-5. The model never sees credentials, keys, or other documents. One scan = one isolated context.
-6. The scanner has no tools, no function-calling, no retrieval. It cannot act on instructions even if it tried to follow them.
+1. **Layer 1 runs first.** By the time Layer 2 sees the text, PII is already tokenised. Denis cannot leak what it never received.
+2. **Denis is a classifier, not a generative model.** It produces a fixed `{ poison_probability, trust_weight, predicted_attack_type }` output. There is no free-text completion, no tool use, no function calling, and no prompt to inject — instructions hidden in the input cannot redirect a binary classifier.
+3. The model is hosted in an isolated Gradio Space. It never sees credentials, keys, or other documents. One scan = one isolated inference call.
+4. Layer 2 has no tools, no retrieval, no side effects. It cannot act on instructions even if it tried to follow them.
 
 ## The Token Map
 
@@ -76,4 +74,4 @@ Failure to detect (`expected_verdict: block` but got `allow`) is the loudest fai
 - **Never echo the system prompt** in API responses, even when debugging. If you need a debug field, gate it behind `process.env.NODE_ENV !== "production"` **and** `DEBUG_SCAN=true`.
 - **Treat all PDFs as adversarial** during the hackathon. Do not open them in your IDE preview if the simulator produced them.
 - **Do not commit secrets**, even fake-looking ones. `.env*` is already in `.gitignore`; do not weaken it.
-- **Layer 1 must run before Layer 2.** Sending unmasked PII to Groq is the worst possible product bug. It would invalidate the entire pitch.
+- **Layer 1 must run before Layer 2.** Sending unmasked PII to Denis (or any downstream model) is the worst possible product bug. It would invalidate the entire pitch.

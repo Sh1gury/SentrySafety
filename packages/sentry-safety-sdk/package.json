@@ -3,6 +3,7 @@
   "version": "0.1.0",
   "description": "TypeScript SDK for the Sentry Safety pre-RAG firewall API",
   "license": "MIT",
+  "sideEffects": false,
   "main": "./dist/index.js",
   "module": "./dist/index.mjs",
   "types": "./dist/index.d.ts",

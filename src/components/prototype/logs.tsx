@@ -92,19 +92,18 @@ function synthesizeScanRecord(r: ServerRow): ScanRecord {
     latency: r.latency,
     bytes: r.bytes,
     preview: '(Preview not stored in server logs)',
+    clean_text: '(Clean text not stored in server logs)',
     tokenMap: {},
     layer1: {
       verdict: (r.raw.layer1Verdict as import('@/types/scan').Verdict) || 'allow',
-      categories: {},
-      threat_scores: {},
-      latency_ms: r.raw.layer1Ms || 0,
+      removed_paragraphs: 0,
     },
     layer2: {
       verdict: (r.raw.layer2Verdict as import('@/types/scan').Verdict) || 'allow',
       score: 0,
       agents: {
-        semantic: { score: 0, flags: [] },
-        logic: { score: 0, flags: [] },
+        semantic: { verdict: 'allow', score: 0 },
+        logic: { verdict: 'allow', score: 0 },
       },
       demoMode: false,
     },
@@ -298,8 +297,8 @@ export function LogsPage({
                     {threatList.length === 0
                       ? <span className="cell-dim">—</span>
                       : threatList.slice(0, 2).map(t => (
-                          <span key={t} className={verdict === 'block' ? 'badge badge-block' : 'badge badge-warn'} style={{ marginRight: 4 }}>{t.replace(/_/g, ' ')}</span>
-                        ))
+                        <span key={t} className={verdict === 'block' ? 'badge badge-block' : 'badge badge-warn'} style={{ marginRight: 4 }}>{t.replace(/_/g, ' ')}</span>
+                      ))
                     }
                     {threatList.length > 2 && <span className="cell-dim">+{threatList.length - 2}</span>}
                   </td>

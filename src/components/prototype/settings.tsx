@@ -1,11 +1,9 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { PageHeader, Toggle, classNames } from './shared';
-import { getDemoApiKey } from './apiKey';
 import type { ScanConfig } from './types';
 
-const DEMO_API_KEY = getDemoApiKey();
 const API_ENDPOINT = '/api/v1/sanitize';
 
 export function SettingsPage({
@@ -27,8 +25,20 @@ export function SettingsPage({
   saving: boolean;
   savedAt: number | null;
 }) {
+  const [apiKey, setApiKey] = useState<string | null>(null);
+  const [keyLoading, setKeyLoading] = useState(true);
   const [keyVisible, setKeyVisible] = useState(false);
   const [copied, setCopied] = useState<string | null>(null);
+
+  useEffect(() => {
+    fetch('/api/v1/api-key')
+      .then(r => r.ok ? r.json() : null)
+      .then((data: { apiKey: string } | null) => {
+        if (data?.apiKey) setApiKey(data.apiKey);
+      })
+      .catch(() => {})
+      .finally(() => setKeyLoading(false));
+  }, []);
 
   function copy(text: string, id: string) {
     navigator.clipboard.writeText(text).catch(() => {});
@@ -91,17 +101,26 @@ export function SettingsPage({
               </div>
             </div>
             <div>
-              <label className="label">API Key (demo)</label>
+              <label className="label">API Key</label>
               <div className="api-key-row">
-                <div className="api-key-field">
-                  {keyVisible ? DEMO_API_KEY : DEMO_API_KEY.slice(0, 10) + '•'.repeat(16)}
+                <div className="api-key-field" style={{ fontFamily: 'var(--mono)', fontSize: 12 }}>
+                  {keyLoading
+                    ? 'Loading...'
+                    : apiKey
+                      ? keyVisible ? apiKey : apiKey.slice(0, 10) + '•'.repeat(16)
+                      : 'Unavailable'}
                 </div>
-                <button className="btn btn-sm" onClick={() => setKeyVisible(v => !v)}>
+                <button
+                  className="btn btn-sm"
+                  onClick={() => setKeyVisible(v => !v)}
+                  disabled={!apiKey}
+                >
                   {keyVisible ? 'Hide' : 'Reveal'}
                 </button>
                 <button
                   className={classNames('btn btn-sm', copied === 'key' && 'btn-primary')}
-                  onClick={() => copy(DEMO_API_KEY, 'key')}
+                  onClick={() => apiKey && copy(apiKey, 'key')}
+                  disabled={!apiKey}
                 >
                   {copied === 'key' ? '✓ Copied' : 'Copy'}
                 </button>

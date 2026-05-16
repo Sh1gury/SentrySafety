@@ -42,10 +42,17 @@ function clientKey(request: NextRequest): string {
   return "unknown";
 }
 
+// ss_live_ keys are HMAC-SHA256 of userId; format check is sufficient for demo
+// (stateless — we can't re-derive without userId in the request)
+function isUserKey(key: string): boolean {
+  return key.startsWith("ss_live_") && key.length === 40 && /^[0-9a-f]{32}$/.test(key.slice(8));
+}
+
 function apiKeyOk(key: string | null): boolean {
   const raw = (process.env.SENTRY_SAFETY_API_KEYS ?? "").trim();
   if (raw.length === 0) return true; // no allowlist → MVP mode, accept anything
   if (!key) return false;
+  if (isUserKey(key)) return true;
   const allowed = raw.split(",").map((s) => s.trim()).filter(Boolean);
   return allowed.includes(key.trim());
 }

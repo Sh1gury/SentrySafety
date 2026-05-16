@@ -6,7 +6,7 @@ When the user identifies as Anton, treat this file as authoritative for model se
 
 - `src/app/api/**` — Next.js Route Handlers. Primary: `POST /api/v1/sanitize`, `GET /api/health`.
 - `src/lib/sanitizer/**` — **Layer 1** (deterministic): PII regex, NER, MIME, zip-bomb, macros, signatures.
-- `src/lib/ai/**` — **Layer 2 + 3**: Denis ML Gradio Space client (`denisClient.ts`), `layer2Pipeline.ts` (Denis + `mockLayer2()` fallback), fusion, autophagy via HF Inference API. No Groq, no OpenAI.
+- `src/lib/ai/**` — **Layer 2 + 3**: Denis ML Gradio Space client (`denisClient.ts`), `layer2Pipeline.ts` (Denis + `mockLayer2()` fallback), fusion, autophagy via HF Inference API.
 - `next.config.ts`, `package.json` (deps), `.env.example`.
 
 Public contract: `POST /api/v1/sanitize` + `src/types/scan.ts`. Everyone else depends on these.
@@ -47,7 +47,7 @@ Do not let training-data instincts override Context7 output.
 1. **Layer 1 runs before Layer 2. Always.** Even when `DEMO_MODE=true`. PII never leaves this process unmasked — that is the pitch.
 2. **Never log raw `request.body`** or document content at INFO level. Log `scanId` + length + verdict only.
 3. **Denis is a classifier, not a generator.** No prompt to build, no JSON-mode enforcement. Just POST text, parse `predicted_attack_type` + `poison_probability`.
-4. **`mockLayer2()` is the only Layer 2 fallback.** No Groq, no OpenAI — they are not in the stack. Triggered when `DEMO_MODE=true` or Denis fails.
+4. **`mockLayer2()` is the only Layer 2 fallback.** Triggered when `DEMO_MODE=true` or Denis fails.
 5. **DEMO_MODE shim is a first-class code path**, not a hack. It must produce schema-valid responses with `metadata.layer2.demoMode: true`.
 6. **Layer 3 failure must not fail the whole sanitize call.** If HF Inference dies, fall back to the local heuristic and keep going.
 

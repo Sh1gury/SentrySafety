@@ -1,0 +1,14 @@
+{
+  "name": "sentry-safety-sdk-demo",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Standalone demo that installs @sentry-safety/sdk and runs console tests",
+  "scripts": {
+    "install-sdk": "npm install",
+    "test": "node test.mjs"
+  },
+  "dependencies": {
+    "@sentry-safety/sdk": "file:../packages/sentry-safety-sdk"
+  }
+}
